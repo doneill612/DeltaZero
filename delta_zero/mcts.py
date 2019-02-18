@@ -39,7 +39,8 @@ class MCTS(object):
         else:
             counts = [c**(1. / temp) for c in counts]
             p = [c / float(sum(counts)) for c in counts]
-            if self.params.resign_threshold and v > self.params.resign_threshold:
+            if (self.params.resign_threshold and v > self.params.resign_threshold) \
+               or not self.params.resign_threshold:
                 res['a'] = np.random.choice(labels, p=p)
             res['pr'] = p
             return res
