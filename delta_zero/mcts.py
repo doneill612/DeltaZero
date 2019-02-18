@@ -10,8 +10,7 @@ def_params = dotdict(
 
 class MCTS(object):
 
-    def __init__(self, agent, network, params):
-        self.env = agent.env.copy()
+    def __init__(self, network, params):
         self.network = network
         self.params = params
         self.q_sa = {}
@@ -21,12 +20,12 @@ class MCTS(object):
         self.e_s = {}
         self.v_s = {}
 
-    def pi(self, c_state, temp=1):
+    def pi(self, env, temp=1):
 
-        v = self._search(self.env)
+        v = self._search(env)
 
         res = {'a': None, 'pr': None}
-        s = self.env.to_string()
+        s = env.to_string()
         counts = [self.n_sa[(s, a_idx)] if (s, a_idx) in self.n_sa else 0
                   for a_idx in range(len(labels))]
         if temp == 0:
@@ -57,7 +56,7 @@ class MCTS(object):
 
         if s not in self.p_s:
             self.p_s[s], v = self.network.predict(c_state)
-            legal = np.asarray(self.env.legal_moves)
+            legal = np.asarray(env.legal_moves)
             legal_mask = np.isin(labels, legal, assume_unique=True)
             self.p_s[s] = self.p_s[s] * legal_mask
             sum_p_s_s = np.sum(self.p_s[s])

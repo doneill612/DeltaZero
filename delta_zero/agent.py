@@ -26,7 +26,7 @@ class ChessAgent(object):
             c_state = self.env.canonical_board_state
             temperature = int(step < self.params.temp_threshold)
 
-            pi = self.search_tree.pi(c_state, temp=temperature)
+            pi = self.search_tree.pi(self.env.copy(), temp=temperature)
             examples.append([c_state, turn, pi['pr']])
 
             action = pi['a']
