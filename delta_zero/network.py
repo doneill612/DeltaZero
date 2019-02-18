@@ -6,10 +6,14 @@ from keras.optimizers import *
 
 import numpy as np
 
-from utils import labels
+from utils import labels, dotdict
 
 def_hparams = dotdict(
-    
+    channels_in=256,
+    input_kernel_size=5,
+    residual_kernel_size=3,
+    n_residual_layers=5,
+    learning_rate=0.2
 )
 
 class INeuralNetwork(object, metaclass=ABCMeta):
@@ -18,11 +22,13 @@ class INeuralNetwork(object, metaclass=ABCMeta):
         self.name = name
         self.hparams = hparams
         self.model = self.build()
-
+        self.model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
+                           lr=self.hparams.learning_rate)
+        
     @abstractmethod
     def build(self):
         '''
-        Builds and compiles the network model.
+        Builds the network model.
         '''
         raise NotImplementedError('build method must be implemented')
 
@@ -103,8 +109,9 @@ class ChessNetwork(INeuralNetwork):
         return X
 
         
-    def _residual_layers(self, X, name):
+    def _residual_layers(self, X):
         for i in range(self.hparams.n_residual_layers):
+            name = f'res{i}'
             _X = X
             X = Conv2D(filters=self.hparams.channels_in,
                        kernel_size=self.hparams.residual_kernel_size,
