@@ -1,4 +1,7 @@
 from abc import ABCMeta, abstractmethod
+from datetime import datetime
+
+import os
 
 from keras.models import *
 from keras.layers import *
@@ -13,7 +16,9 @@ def_hparams = dotdict(
     input_kernel_size=5,
     residual_kernel_size=3,
     n_residual_layers=5,
-    learning_rate=0.2
+    learning_rate=0.2,
+    batch_size=64,
+    epochs=10
 )
 
 class INeuralNetwork(object, metaclass=ABCMeta):
@@ -81,6 +86,43 @@ class ChessNetwork(INeuralNetwork):
         value = self._value_layer(X, residuals)
 
         return Model(X_in, [policy, value], name=self.name)
+
+    def train(self, examples):
+
+        state, target_pi, target_v = list(zip(*examples))
+        state = np.asarray(state)
+        target_pi = np.asarray(target_pi)
+        target_v = np.asarray(target_v)
+        self.model.fit(x=state,y=[target_pi, target_v],
+                       batch_size=self.hparams.batch_size,
+                       epochs=self.hparams.epochs)
+
+    def predict(self, state):
+
+        pi, v = self.model.predict(state)
+        return pi[0], v[0]
+
+    def save(self):
+        directory = os.path.join(os.path.pardir, 'data', 'models', 'current', 'weights')
+        
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            
+        fn = f'{self.name}_checkpoint.pth.tar'
+        fn = os.path.join(directory, fn)
+        self.model.save_weights(fn)
+
+    def load(self):
+        directory = os.path.join(os.path.pardir, 'data', 'models', 'current', 'weights')
+            
+        fn = f'{self.name}_checkpoint.pth.tar'
+        fn = os.path.join(directory, fn)
+
+        if not os.path.exists(fn):
+            raise ValueError(f'Could not load weights for model name: {self.name} : No checkpoint found.')
+
+        self.model.load_weights(fn)
+    
 
     def _value_layer(self, X, residuals):
         X = Conv2D(filters=4,

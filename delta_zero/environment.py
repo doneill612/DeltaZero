@@ -1,3 +1,4 @@
+import copy
 import chess
 import numpy as np
 
@@ -137,6 +138,12 @@ class ChessEnvironment(object):
         '''
         self.winner = None
         self.board = chess.Board()
+
+    def copy(self):
+        return copy.deepcopy(self)
+
+    def to_string(self):
+        return self.canonical_board_state.tostring()
         
     def _end_game(self, winner):
         self.winner = RESULT[winner]

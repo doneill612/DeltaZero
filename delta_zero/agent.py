@@ -27,9 +27,9 @@ class ChessAgent(object):
             temperature = int(step < self.params.temp_threshold)
 
             pi = self.search_tree.pi(c_state, temp=temperature)
-            examples.append([c_state, turn, pi])
+            examples.append([c_state, turn, pi['pr']])
 
-            action = np.random.choice(pi['a'], p=pi['p'])
+            action = pi['a']
             turn *= -1
 
             self.env.push_action(action)
