@@ -18,13 +18,13 @@ import numpy as np
 from .utils import labels, dotdict
 
 def_hparams = dotdict(
-    channels_in=1152,
+    channels_in=256,
     input_kernel_size=5,
     residual_kernel_size=3,
-    n_residual_layers=5,
-    learning_rate=0.02,
+    n_residual_layers=10,
+    learning_rate=0.002,
     batch_size=32,
-    epochs=10,
+    epochs=3,
     l2_reg=1e-4
 )
 

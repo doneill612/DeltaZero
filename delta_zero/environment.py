@@ -1,4 +1,6 @@
 import copy
+import os
+
 import chess
 import numpy as np
 
@@ -129,9 +131,13 @@ class ChessEnvironment(object):
     def adjudicate(self):
 
         handler = uci.InfoHandler()
-        engine = uci.popen_engine('stockfish-10-linux/Linux/stockfish_10_x64')
+        ep = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'stockfish-10-win',
+                          'Windows',
+                          'stockfish_10_x64.exe')
+        engine = uci.popen_engine(ep)
         engine.info_handlers.append(handler)
-        engine.position(env.board)
+        engine.position(self.board)
         evaltime = 1000
         evalu = engine.go(movetime=evaltime)
         score = handler.info['score'][1].cp
