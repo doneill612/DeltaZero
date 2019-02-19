@@ -1,8 +1,8 @@
 import argparse
+
 from random import shuffle
 
 import numpy as np
-from tqdm import tqdm
 
 from delta_zero.utils import dotdict
 from delta_zero.network import ChessNetwork 
@@ -22,10 +22,10 @@ def train(n_sessions, n_games):
     search_tree = MCTS(network)
     agent = ChessAgent(search_tree, env)
 
-    for _ in tqdm(range(n_sessions), ascii=True, desc='Running sessions', position=0):
+    for _ in range(n_sessions):
         train_examples = []
 
-        for __ in tqdm(range(n_games), ascii=True, desc='Playing games', position=1):
+        for __ in range(n_games):
             train_examples.append(agent.play())
 
         shuffle(train_examples)

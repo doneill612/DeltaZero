@@ -7,7 +7,7 @@ EPS = 1e-8
 def_params = dotdict(
     n_sims=10,
     cpuct=1.0,
-    resign_threshold=None
+    resign_threshold=-0.8,
 )
 
 class MCTS(object):
@@ -21,7 +21,7 @@ class MCTS(object):
         self.p_s = {}
         self.e_s = {}
         self.v_s = {}        
-        
+
     def pi(self, env, temp):
 
         sim_vs = []
@@ -30,11 +30,13 @@ class MCTS(object):
 
         v = np.max(sim_vs)
 
-        res = {'a': None, 'pr': None}
+        res = {'a': None, 'pr': None, 'v': None}
         s = env.to_string()
         counts = [self.n_sa[(s, a_idx)] if (s, a_idx) in self.n_sa else 0
                   for a_idx in range(len(labels))]
 
+        res['v'] = v
+        
         if temp == 0:
             best_action_idx = np.argmax(counts)
             best_action = labels[best_action_idx]

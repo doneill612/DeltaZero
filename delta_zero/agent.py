@@ -1,5 +1,9 @@
 import numpy as np
 
+from numba import jit
+
+import time
+
 from .utils import dotdict
 
 def_params = dotdict(
@@ -12,7 +16,7 @@ class ChessAgent(object):
         self.env = env
         self.search_tree = search_tree
         self.params = params
-        
+
     def play(self):
         '''
         Makes the agent play itself in a game of chess.
@@ -27,15 +31,21 @@ class ChessAgent(object):
             temperature = int(step < self.params.temp_threshold)
 
             pi = self.search_tree.pi(self.env.copy(), temp=temperature)
+       
             examples.append([c_state, turn, pi['pr']])
 
             action = pi['a']
+            evaluation = pi['v']
+            if action:
+                print(f'{"White" if turn == 1 else "Black"} played '
+                      f'{action}. Evaluation: {evaluation}\n{self.env}\n\n')
+
             turn *= -1
-        
             self.env.push_action(action)
             
 
         res_val = self.env.result_value()
+        print(f'Game result: {self.env.result_string()}')
         self.env.reset()
         
         

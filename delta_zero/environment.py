@@ -124,13 +124,31 @@ class ChessEnvironment(object):
                 self._end_game(0)
         return self.winner != None
 
+    def push_action(self, action_uci, verbose=True):
+        '''
+        Updates the internal board representation by pushing an "action" to the move stack.
+
+        Params
+        ------
+            action_uci (str): a string representing the move to make in UCI notation
+
+        '''
+        if action_uci is not None:
+            self.board.push_uci(action_uci)
+            
+        else:
+            if verbose:
+                print(f'{"White" if self.white_to_move else "Black"} resigns.')
+            self._send_resignation()
+
+    
     def _send_resignation(self):
         '''
         Forcefully transitions the environment into a finished game state.
 
         The winner becomes the opposite of the side to move.
         '''
-        self._end_game(int(not self.white_to_move))
+        self._end_game(-1 if self.white_to_move else 0)
 
     def reset(self):
         '''
@@ -223,20 +241,6 @@ class ChessEnvironment(object):
             auxiliary_planes[EPS][r][f] = 1
                                   
         return auxiliary_planes
-
-    def push_action(self, action_uci):
-        '''
-        Updates the internal board representation by pushing an "action" to the move stack.
-
-        Params
-        ------
-            action_uci (str): a string representing the move to make in UCI notation
-
-        '''
-        if action_uci is not None:
-            self.board.push_uci(action_uci)
-        else:
-            self._send_resignation()
 
     def get_pieces(self, ptype, pcolor):
         '''
