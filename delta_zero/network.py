@@ -9,7 +9,7 @@ from keras.optimizers import *
 
 import numpy as np
 
-from utils import labels, dotdict
+from .utils import labels, dotdict
 
 def_hparams = dotdict(
     channels_in=256,
@@ -28,7 +28,7 @@ class INeuralNetwork(object, metaclass=ABCMeta):
         self.hparams = hparams
         self.model = self.build()
         self.model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
-                           lr=self.hparams.learning_rate)
+                           optimizer=Adam(self.hparams.learning_rate))
         
     @abstractmethod
     def build(self):
@@ -67,8 +67,8 @@ class INeuralNetwork(object, metaclass=ABCMeta):
 
 class ChessNetwork(INeuralNetwork):
 
-    def __init__(self):
-        super(ChessNetwork, self).__init__('delta_zero', def_hparams)
+    def __init__(self, name='delta_zero'):
+        super(ChessNetwork, self).__init__(name, def_hparams)
 
     def build(self):
         X_in = X = Input(shape=(18, 8, 8))
@@ -99,6 +99,7 @@ class ChessNetwork(INeuralNetwork):
 
     def predict(self, state):
 
+        state = np.expand_dims(state, axis=0)
         pi, v = self.model.predict(state)
         return pi[0], v[0]
 
@@ -170,7 +171,7 @@ class ChessNetwork(INeuralNetwork):
                        use_bias=False,
                        name=f'conv2d_{name}_2')(X)
             X = BatchNormalization(axis=1, name=f'batchnorm_{name}_2')(X)
-            X = Add(name='combine_{name}')([_X, X])
+            X = Add(name=f'combine_{name}')([_X, X])
             X = Activation('relu', name=f'relu_{name}_2')(X)
         return X
     

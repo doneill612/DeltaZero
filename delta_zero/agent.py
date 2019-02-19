@@ -1,14 +1,14 @@
 import numpy as np
 
-from utils import dotdict
+from .utils import dotdict
 
 def_params = dotdict(
-    temp_threshold=0.0
+    temp_threshold=10
 )
 
 class ChessAgent(object):
 
-    def __init__(self, search_tree, params=def_params):
+    def __init__(self, search_tree, env, params=def_params):
         self.env = env
         self.search_tree = search_tree
         self.params = params
@@ -31,10 +31,13 @@ class ChessAgent(object):
 
             action = pi['a']
             turn *= -1
-
+        
             self.env.push_action(action)
             
+
+        res_val = self.env.result_value()
         self.env.reset()
         
-        return [(ex[0], ex[2], self.env.result_value() * ((-1)**(ex[1] != turn)))
+        
+        return [(ex[0], ex[2], res_val * ((-1)**(ex[1] != turn)))
                 for ex in examples]

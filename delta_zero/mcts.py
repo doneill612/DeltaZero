@@ -1,16 +1,18 @@
 import numpy as np
 
-from utils import dotdict, labels
+from .utils import dotdict, labels
 
 EPS = 1e-8
 
 def_params = dotdict(
-    n_sims=10
+    n_sims=10,
+    cpuct=1.0,
+    resign_threshold=None
 )
 
 class MCTS(object):
 
-    def __init__(self, network, params):
+    def __init__(self, network, params=def_params):
         self.network = network
         self.params = params
         self.q_sa = {}
@@ -18,16 +20,21 @@ class MCTS(object):
         self.n_s = {}
         self.p_s = {}
         self.e_s = {}
-        self.v_s = {}
+        self.v_s = {}        
+        
+    def pi(self, env, temp):
 
-    def pi(self, env, temp=1):
+        sim_vs = []
+        for i in range(self.params.n_sims):
+            sim_vs.append(self._search(env))
 
-        v = self._search(env)
+        v = np.max(sim_vs)
 
         res = {'a': None, 'pr': None}
         s = env.to_string()
         counts = [self.n_sa[(s, a_idx)] if (s, a_idx) in self.n_sa else 0
                   for a_idx in range(len(labels))]
+
         if temp == 0:
             best_action_idx = np.argmax(counts)
             best_action = labels[best_action_idx]
@@ -46,7 +53,8 @@ class MCTS(object):
             return res
 
     def _search(self, env):
-        
+
+        env = env.copy()
         s = env.to_string()
         c_state = env.canonical_board_state
         
@@ -55,6 +63,7 @@ class MCTS(object):
         if self.e_s[s] != 0:
             return -self.e_s[s]
 
+        
         if s not in self.p_s:
             self.p_s[s], v = self.network.predict(c_state)
             legal = np.asarray(env.legal_moves)
@@ -86,20 +95,21 @@ class MCTS(object):
                 if u > cur_best:
                     cur_best = u
                     best_action_idx = a_idx
+
         best_action = labels[best_action_idx]
 
         env.push_action(best_action)
         v = self._search(env)
 
         if (s, best_action_idx) in self.q_sa:
-            self.q_sa[(s, best_action_index)] = (
-                self.n_sa[(s, best_action_index)] *
-                self.q_sq[(s, best_action_index)] + v
-            ) / (self.n_sa[(s, best_action_index)] + 1)
-            self.n_sa[(s, best_action_index)] += 1
+            self.q_sa[(s, best_action_idx)] = (
+                self.n_sa[(s, best_action_idx)] *
+                self.q_sa[(s, best_action_idx)] + v
+            ) / (self.n_sa[(s, best_action_idx)] + 1)
+            self.n_sa[(s, best_action_idx)] += 1
         else:
-            self.q_sa[(s, best_action_index)] = v
-            self.n_sa[(s, best_action_index)] = 1
+            self.q_sa[(s, best_action_idx)] = v
+            self.n_sa[(s, best_action_idx)] = 1
 
         self.n_s[s] += 1
         return -v

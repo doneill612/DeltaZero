@@ -279,3 +279,4 @@ if __name__ == '__main__':
     env.push_action('e2e4')
     print(f'White pawns (Black POV):\n\n{env.canonical_board_state[0]}'
           f'\n\nWhite pawns (White POV):\n\n{env.board_state[0]}')
+    print(env.to_string())
