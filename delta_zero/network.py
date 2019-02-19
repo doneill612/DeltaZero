@@ -3,23 +3,32 @@ from datetime import datetime
 
 import os
 
-from keras.models import *
-from keras.layers import *
-from keras.optimizers import *
+from keras.engine.topology import Input
+from keras.engine.training import Model
+from keras.layers.convolutional import Conv2D
+from keras.layers.normalization import BatchNormalization
+from keras.layers.merge import Add
+from keras.layers.core import Activation, Dense, Flatten
+from keras.models import Model
+from keras.optimizers import Adam
+from keras.regularizers import l2
 
 import numpy as np
 
 from .utils import labels, dotdict
 
 def_hparams = dotdict(
-    channels_in=256,
+    channels_in=1152,
     input_kernel_size=5,
     residual_kernel_size=3,
     n_residual_layers=5,
-    learning_rate=0.2,
-    batch_size=64,
-    epochs=10
+    learning_rate=0.02,
+    batch_size=32,
+    epochs=10,
+    l2_reg=1e-4
 )
+
+
 
 class INeuralNetwork(object, metaclass=ABCMeta):
 
@@ -74,6 +83,7 @@ class ChessNetwork(INeuralNetwork):
         X_in = X = Input(shape=(18, 8, 8))
         X = Conv2D(filters=self.hparams.channels_in,
                    kernel_size=self.hparams.input_kernel_size,
+                   kernel_regularizer=l2(self.hparams.l2_reg),
                    padding='same',
                    data_format='channels_first',
                    use_bias=False,
@@ -103,32 +113,43 @@ class ChessNetwork(INeuralNetwork):
         pi, v = self.model.predict(state)
         return pi[0], v[0]
 
-    def save(self):
+    def save(self, ckpt=None):
+        print('Saving model...')
         directory = os.path.join(os.path.pardir, 'data', 'models', 'current', 'weights')
         
         if not os.path.exists(directory):
             os.makedirs(directory)
-            
-        fn = f'{self.name}_checkpoint.pth.tar'
+
+        if ckpt is not None:
+            fn = f'{self.name + "_" + ckpt}_checkpoint.pth.tar'
+        else:
+            fn = f'{self.name}_def_checkpoint.pth.tar'
         fn = os.path.join(directory, fn)
         self.model.save_weights(fn)
+        print(f'Model saved to {fn}')
 
-    def load(self):
+    def load(self, ckpt=None):
+        print('Attempting model load...')
         directory = os.path.join(os.path.pardir, 'data', 'models', 'current', 'weights')
             
-        fn = f'{self.name}_checkpoint.pth.tar'
+        if ckpt is not None:
+            fn = f'{self.name + "_" + ckpt}_checkpoint.pth.tar'
+        else:
+            fn = f'{self.name}_def_checkpoint.pth.tar'
         fn = os.path.join(directory, fn)
 
         if not os.path.exists(fn):
             raise ValueError(f'Could not load weights for model name: {self.name} : No checkpoint found.')
 
         self.model.load_weights(fn)
+        print(f'Model loaded from {fn}')
     
 
     def _value_layer(self, X, residuals):
         X = Conv2D(filters=4,
                    kernel_size=1,
                    data_format='channels_first',
+                   kernel_regularizer=l2(self.hparams.l2_reg),
                    use_bias=False,
                    name='value_conv2d')(residuals)
         X = BatchNormalization(axis=1, name='value_batchnorm')(X)
@@ -140,6 +161,7 @@ class ChessNetwork(INeuralNetwork):
     def _policy_layer(self, X):
 
         X = Conv2D(filters=self.hparams.channels_in,
+                   kernel_regularizer=l2(self.hparams.l2_reg),
                    kernel_size=1,
                    padding='same',
                    data_format='channels_first',
@@ -158,6 +180,7 @@ class ChessNetwork(INeuralNetwork):
             _X = X
             X = Conv2D(filters=self.hparams.channels_in,
                        kernel_size=self.hparams.residual_kernel_size,
+                       kernel_regularizer=l2(self.hparams.l2_reg),
                        padding='same',
                        data_format='channels_first',
                        use_bias=False,
@@ -166,6 +189,7 @@ class ChessNetwork(INeuralNetwork):
             X = Activation('relu', name=f'relu_{name}_1')(X)
             X = Conv2D(filters=self.hparams.channels_in,
                        kernel_size=self.hparams.residual_kernel_size,
+                       kernel_regularizer=l2(self.hparams.l2_reg),
                        padding='same',
                        data_format='channels_first',
                        use_bias=False,

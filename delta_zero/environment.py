@@ -2,6 +2,8 @@ import copy
 import chess
 import numpy as np
 
+import chess.uci as uci
+
 PIECES = [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING] = range(1, 7)
 COLORS = [WHITE, BLACK] = [True, False]
 
@@ -123,6 +125,30 @@ class ChessEnvironment(object):
             else:
                 self._end_game(0)
         return self.winner != None
+
+    def adjudicate(self):
+
+        handler = uci.InfoHandler()
+        engine = uci.popen_engine('stockfish-10-linux/Linux/stockfish_10_x64')
+        engine.info_handlers.append(handler)
+        engine.position(env.board)
+        evaltime = 1000
+        evalu = engine.go(movetime=evaltime)
+        score = handler.info['score'][1].cp
+        if score is None:
+            score = f'Mate in {handler.info["score"][1].mate}'
+        else:
+            score = score / 100.
+
+        if isinstance(score, str):
+            self._end_game(1 if self.white_to_move else -1)
+        else:
+            if score > 2.:
+                self._end_game(1)
+            elif score < -2:
+                self._end_game(-1)
+            else:
+                self._end_game(0)
 
     def push_action(self, action_uci, verbose=True):
         '''
@@ -280,7 +306,8 @@ class ChessEnvironment(object):
 if __name__ == '__main__':
 
     env = ChessEnvironment()
-    env.push_action('e2e4')
-    print(f'White pawns (Black POV):\n\n{env.canonical_board_state[0]}'
-          f'\n\nWhite pawns (White POV):\n\n{env.board_state[0]}')
-    print(env.to_string())
+    env.push_action('g2g4')
+    env.push_action('e7e6')
+    env.adjudicate()
+    print(env.winner)
+    

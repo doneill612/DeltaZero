@@ -1,14 +1,14 @@
 import numpy as np
 
-from numba import jit
-
 import time
 
 from .utils import dotdict
 
 def_params = dotdict(
-    temp_threshold=10
+    temp_threshold=10,
+    max_hmoves=500
 )
+
 
 class ChessAgent(object):
 
@@ -27,27 +27,42 @@ class ChessAgent(object):
         while not self.env.is_game_over:
             step += 1
             
+            if step > self.params.max_hmoves:
+                print('Half move limit reached - adjudicating')
+                self.env.adjudicate()
+                continue
+
+            if step % 25 == 0:
+                print(f'{step} half moves executed this game...', end='\r')
+            
             c_state = self.env.canonical_board_state
             temperature = int(step < self.params.temp_threshold)
 
             pi = self.search_tree.pi(self.env.copy(), temp=temperature)
-       
+            
             examples.append([c_state, turn, pi['pr']])
-
+ 
             action = pi['a']
             evaluation = pi['v']
-            if action:
-                print(f'{"White" if turn == 1 else "Black"} played '
-                      f'{action}. Evaluation: {evaluation}\n{self.env}\n\n')
-
+            
             turn *= -1
             self.env.push_action(action)
             
 
         res_val = self.env.result_value()
-        print(f'Game result: {self.env.result_string()}')
+        print(f'\nGame result: {self.env.result_string()}')
+        self.reset()
+        examples = [(ex[0], ex[2], res_val * ((-1)**(ex[1] != turn))) for ex in examples]
+        
+        return examples
+
+    def reset(self):
         self.env.reset()
-        
-        
-        return [(ex[0], ex[2], res_val * ((-1)**(ex[1] != turn)))
-                for ex in examples]
+        self.search_tree.reset()
+
+
+if __name__ == '__main__':
+    for i in range(10):
+        print(f'{i}', end='\r')
+        time.sleep(0.5)
+    print('\n on new line i hope')

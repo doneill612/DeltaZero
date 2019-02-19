@@ -54,6 +54,14 @@ class MCTS(object):
             res['pr'] = p
             return res
 
+    def reset(self):
+        self.q_sa = {}
+        self.n_sa = {}
+        self.n_s = {}
+        self.p_s = {}
+        self.e_s = {}
+        self.v_s = {}
+        
     def _search(self, env):
 
         env = env.copy()

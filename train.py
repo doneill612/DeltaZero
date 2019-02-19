@@ -22,16 +22,17 @@ def train(n_sessions, n_games):
     search_tree = MCTS(network)
     agent = ChessAgent(search_tree, env)
 
-    for _ in range(n_sessions):
+    for s in range(n_sessions):
         train_examples = []
 
-        for __ in range(n_games):
-            train_examples.append(agent.play())
+        for g in range(n_games):
+            print(f'Playing game {g+1}...')
+            train_examples.extend(agent.play())
 
         shuffle(train_examples)
         network.train(train_examples)
-
-    network.save()
+        network.save(ckpt=str(s))
+        
     print('Session complete')    
         
 
