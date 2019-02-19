@@ -2,7 +2,7 @@ import argparse
 from random import shuffle
 
 import numpy as np
-import tqdm
+from tqdm import tqdm
 
 from delta_zero.utils import dotdict
 from delta_zero.network import ChessNetwork 
@@ -37,11 +37,13 @@ def train(n_sessions, n_games):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+
+    parser.add_argument('n_sessions', type=int,
+                        help='The number of sessions of self-play to execute')
     parser.add_argument('n_games', type=int,
                         help='The number of games of self-play to train on '
                              'in this session.')
-    parser.add_argument('n_sessions', type=int,
-                        help='The number of sessions of self-play to execute')
+    
     args = parser.parse_args()
     n_games = args.n_games
     n_sessions = args.n_sessions
