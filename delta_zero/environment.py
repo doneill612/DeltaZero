@@ -3,6 +3,7 @@ import os
 import platform
 
 import chess
+import chess.pgn as pgn
 import numpy as np
 
 import chess.uci as uci
@@ -129,8 +130,33 @@ class ChessEnvironment(object):
                 self._end_game(0)
         return self.winner != None
 
-    def adjudicate(self):
+    def to_pgn(self, folder_name, file_name):
+        '''
+        Exports the environment move stack to a .pgn file at the specified location.
 
+        Params
+        ------
+            folder_name (str): The folder name to contain the .pgn file
+            file_name (str): The file name to use for the .pgn file
+        '''
+        pgn_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                'data', folder_name, 'pgns')
+        if not os.path.exists(pgn_path):
+            os.makedirs(pgn_path)
+            
+        game = pgn.Game()
+        for m in self.board.move_stack:
+            game.add_variation(m)
+
+        exporter = pgn.FileExporter(open(os.path.join(pgn_path, file_name), 'w', encoding='utf-8'))
+        game.accept(exporter)
+
+
+    def adjudicate(self):
+        '''
+        Adjudicates the game in progress by performing a centipawn evaluation
+        on the current position using Stockfish 10.
+        '''
         current_os = platform.system()
         handler = uci.InfoHandler()
         ep = os.path.join(os.path.dirname(os.path.abspath(__file__)),

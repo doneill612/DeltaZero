@@ -12,7 +12,7 @@ from delta_zero.environment import ChessEnvironment
 from delta_zero.agent import ChessAgent
 from delta_zero.mcts import MCTS
 
-def run(n_games, net_name, warm_start=None, max_workers=4, verbose=False):
+def run(n_games, net_name, warm_start=None, max_workers=4, verbose=True):
     '''
     Runs self-play in a process pool. The results of all the games
     are saved to a .npy file.
@@ -38,14 +38,14 @@ def run(n_games, net_name, warm_start=None, max_workers=4, verbose=False):
         
         for i, future in enumerate(futures):
             train_examples.extend(future.result())
-            print(f'{i} game{"" if i <= 1 else "s"} finished...')
+            print(f'{i+1} game{"" if i <= 1 else "s"} finished...')
 
-        print('All games complete.')
+        print(f'All games complete. Generated {len(train_examples)} examples.')
 
         shuffle(train_examples)
         save_train_examples(np.asarray(train_examples), net_name)
 
-def selfplay_task(net_name, warm_start, verbose):
+def selfplay_task(net_name, warm_start, verbose=True):
     '''
     Executes self-play task.
 
