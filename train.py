@@ -2,7 +2,7 @@ import argparse
 
 from delta_zero.network import ChessNetwork 
 
-def train(net_name, warm_start=None):
+def train(net_name, version=None, warm_start=None):
 
     network = ChessNetwork(name=net_name)
     try:
@@ -13,7 +13,7 @@ def train(net_name, warm_start=None):
 
     train_examples = load_examples(net_name)
     network.train(train_examples)
-    network.save(ckpt=str(s))
+    network.save(ckpt=str(version))
         
     print('Session complete')    
         
@@ -31,6 +31,7 @@ def load_examples(net_name):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
+    parser.add_argument('version', nargs='?', type=int, help='Network version to save as')
     parser.add_argument('warm_start', nargs='?', type=int, help='Network version warm-start')
     
     args = parser.parse_args()
