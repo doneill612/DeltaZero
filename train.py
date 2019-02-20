@@ -10,12 +10,12 @@ from delta_zero.environment import ChessEnvironment
 from delta_zero.agent import ChessAgent
 from delta_zero.mcts import MCTS
 
-def train(n_sessions, n_games):
+def train(n_sessions, n_games, warm_start=None):
     env = ChessEnvironment()
 
-    network = ChessNetwork()
+    network = ChessNetwork(name='delta_zero3')
     try:
-        network.load()
+        network.load(ckpt=str(warm_start))
     except ValueError as e:
         print(f'WARNING: {e}')
 
@@ -44,9 +44,11 @@ if __name__ == '__main__':
     parser.add_argument('n_games', type=int,
                         help='The number of games of self-play to train on '
                              'in this session.')
+    parser.add_argument('warm_start', nargs='?', type=int)
     
     args = parser.parse_args()
     n_games = args.n_games
     n_sessions = args.n_sessions
-    train(n_sessions, n_games)
+    warm_start = args.warm_start
+    train(n_sessions, n_games, warm_start=warm_start)
     

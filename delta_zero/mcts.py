@@ -83,7 +83,7 @@ class MCTS(object):
             if sum_p_s_s > 0:
                 self.p_s[s] /= sum_p_s_s
             else:
-                self.p_s[s] = self.p_s[s] + valids
+                self.p_s[s] = self.p_s[s] + legal_mask
                 self.p_s[s] /= np.sum(self.p_s[s])
 
             self.v_s[s] = legal_mask

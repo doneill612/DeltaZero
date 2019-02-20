@@ -118,7 +118,7 @@ class ChessEnvironment(object):
         -------
             bool: True if the game is over, False otherwise
         '''
-        res = self.board.result(claim_draw=True) # claim_draw=True => Check 50 move rule
+        res = self.board.result(claim_draw=False) # claim_draw=True => Check 50 move rule
         if res != '*':
             if res == '1-0':
                 self._end_game(1)

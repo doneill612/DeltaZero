@@ -6,7 +6,7 @@ from .utils import dotdict
 
 def_params = dotdict(
     temp_threshold=10,
-    max_hmoves=500
+    max_hmoves=250
 )
 
 
@@ -17,7 +17,7 @@ class ChessAgent(object):
         self.search_tree = search_tree
         self.params = params
 
-    def play(self):
+    def play(self, verbose=False):
         '''
         Makes the agent play itself in a game of chess.
         '''
@@ -33,7 +33,7 @@ class ChessAgent(object):
                 continue
 
             if step % 25 == 0:
-                print(f'{step} half moves executed this game...', end='\r')
+                print(f'{step} half moves executed this game...')
             
             c_state = self.env.canonical_board_state
             temperature = int(step < self.params.temp_threshold)
@@ -47,7 +47,9 @@ class ChessAgent(object):
             
             turn *= -1
             self.env.push_action(action)
-            
+            if verbose:
+                print(f'Move played: {action}\n\n{self.env}')
+                time.sleep(2)
 
         res_val = self.env.result_value()
         print(f'\nGame result: {self.env.result_string()}')

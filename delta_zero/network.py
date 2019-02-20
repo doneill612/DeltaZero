@@ -18,12 +18,14 @@ import numpy as np
 from .utils import labels, dotdict
 
 def_hparams = dotdict(
-    channels_in=256,
-    input_kernel_size=5,
+    filters=256,
+    input_kernel_size=3,
     residual_kernel_size=3,
+    stride=1,
+    fc_size=256,
     n_residual_layers=10,
-    learning_rate=0.002,
-    batch_size=32,
+    learning_rate=0.2,
+    batch_size=64,
     epochs=3,
     l2_reg=1e-4
 )
@@ -81,8 +83,9 @@ class ChessNetwork(INeuralNetwork):
 
     def build(self):
         X_in = X = Input(shape=(18, 8, 8))
-        X = Conv2D(filters=self.hparams.channels_in,
+        X = Conv2D(filters=self.hparams.filters,
                    kernel_size=self.hparams.input_kernel_size,
+                   strides=self.hparams.stride,
                    kernel_regularizer=l2(self.hparams.l2_reg),
                    padding='same',
                    data_format='channels_first',
@@ -91,12 +94,71 @@ class ChessNetwork(INeuralNetwork):
         X = BatchNormalization(axis=1, name='input_batchnorm')(X)
         X = Activation('relu', name='input_relu')(X)
 
-        residuals = self._residual_layers(X)
-        policy = self._policy_layer(X)
-        value = self._value_layer(X, residuals)
+        for i in range(self.hparams.n_residual_layers):
+            name = f'res{i}'
+            X = self._residual_layer(X, name)
+        
+        residuals = X
+        policy_head = self._policy_layer(X)
+        value_head = self._value_layer(X, residuals)
 
-        return Model(X_in, [policy, value], name=self.name)
+        return Model(X_in, [policy_head, value_head], name=self.name)
 
+    def _value_layer(self, X, residuals):
+        X = Conv2D(filters=4,
+                   kernel_size=1,
+                   data_format='channels_first',
+                   kernel_regularizer=l2(self.hparams.l2_reg),
+                   use_bias=False,
+                   name='value_conv2d')(residuals)
+        X = BatchNormalization(axis=1, name='value_batchnorm')(X)
+        X = Activation('relu', name='value_relu')(X)
+        X = Flatten(name='value_flatten')(X)
+        X = Dense(self.hparams.fc_size, activation='relu', name='value_fc')(X)
+        X = Dense(1, activation='tanh', name='value_out')(X)
+        return X
+
+    def _policy_layer(self, X):
+
+        X = Conv2D(filters=self.hparams.filters,
+                   kernel_regularizer=l2(self.hparams.l2_reg),
+                   kernel_size=1,
+                   padding='same',
+                   data_format='channels_first',
+                   use_bias=False,
+                   name='policy_conv2d')(X)
+        X = BatchNormalization(axis=1, name='policy_batchnorm')(X)
+        X = Activation('relu', name='policy_relu')(X)
+        X = Flatten(name='policy_flatten')(X)
+        X = Dense(len(labels), activation='softmax', name='policy_out')(X)
+        return X
+
+        
+    def _residual_layer(self, X, name):
+        _X = X
+        X = Conv2D(filters=self.hparams.filters,
+                   kernel_size=self.hparams.residual_kernel_size,
+                   kernel_regularizer=l2(self.hparams.l2_reg),
+                   padding='same',
+                   data_format='channels_first',
+                   use_bias=False,
+                   name=f'conv2d_{name}_1')(X)
+        X = BatchNormalization(axis=1, name=f'batchnorm_{name}_1')(X)
+        X = Activation('relu', name=f'relu_{name}_1')(X)
+        X = Conv2D(filters=self.hparams.filters,
+                   kernel_size=self.hparams.residual_kernel_size,
+                   kernel_regularizer=l2(self.hparams.l2_reg),
+                   padding='same',
+                   data_format='channels_first',
+                   use_bias=False,
+                   name=f'conv2d_{name}_2')(X)
+        X = BatchNormalization(axis=1, name=f'batchnorm_{name}_2')(X)
+        X = Add(name=f'combine_{name}')([_X, X])
+        X = Activation('relu', name=f'relu_{name}_2')(X)
+            
+        return X
+
+    
     def train(self, examples):
 
         state, target_pi, target_v = list(zip(*examples))
@@ -115,8 +177,11 @@ class ChessNetwork(INeuralNetwork):
 
     def save(self, ckpt=None):
         print('Saving model...')
-        directory = os.path.join(os.path.pardir, 'data', 'models', 'current', 'weights')
-        
+        directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 'data',
+                                 'models',
+                                 'current', 'weights')
+
         if not os.path.exists(directory):
             os.makedirs(directory)
 
@@ -129,8 +194,11 @@ class ChessNetwork(INeuralNetwork):
         print(f'Model saved to {fn}')
 
     def load(self, ckpt=None):
-        print('Attempting model load...')
-        directory = os.path.join(os.path.pardir, 'data', 'models', 'current', 'weights')
+        print(f'Attempting model load... ckpt: {ckpt}')
+        directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 'data',
+                                 'models',
+                                 'current', 'weights')
             
         if ckpt is not None:
             fn = f'{self.name + "_" + ckpt}_checkpoint.pth.tar'
@@ -145,57 +213,10 @@ class ChessNetwork(INeuralNetwork):
         print(f'Model loaded from {fn}')
     
 
-    def _value_layer(self, X, residuals):
-        X = Conv2D(filters=4,
-                   kernel_size=1,
-                   data_format='channels_first',
-                   kernel_regularizer=l2(self.hparams.l2_reg),
-                   use_bias=False,
-                   name='value_conv2d')(residuals)
-        X = BatchNormalization(axis=1, name='value_batchnorm')(X)
-        X = Activation('relu', name='value_relu')(X)
-        X = Flatten(name='value_flatten')(X)
-        X = Dense(1, activation='tanh', name='value_out')(X)
-        return X
-
-    def _policy_layer(self, X):
-
-        X = Conv2D(filters=self.hparams.channels_in,
-                   kernel_regularizer=l2(self.hparams.l2_reg),
-                   kernel_size=1,
-                   padding='same',
-                   data_format='channels_first',
-                   use_bias=False,
-                   name='policy_conv2d')(X)
-        X = BatchNormalization(axis=1, name='policy_batchnorm')(X)
-        X = Activation('relu', name='policy_relu')(X)
-        X = Flatten(name='policy_flatten')(X)
-        X = Dense(len(labels), activation='softmax', name='policy_out')(X)
-        return X
-
-        
-    def _residual_layers(self, X):
-        for i in range(self.hparams.n_residual_layers):
-            name = f'res{i}'
-            _X = X
-            X = Conv2D(filters=self.hparams.channels_in,
-                       kernel_size=self.hparams.residual_kernel_size,
-                       kernel_regularizer=l2(self.hparams.l2_reg),
-                       padding='same',
-                       data_format='channels_first',
-                       use_bias=False,
-                       name=f'conv2d_{name}_1')(X)
-            X = BatchNormalization(axis=1, name=f'batchnorm_{name}_1')(X)
-            X = Activation('relu', name=f'relu_{name}_1')(X)
-            X = Conv2D(filters=self.hparams.channels_in,
-                       kernel_size=self.hparams.residual_kernel_size,
-                       kernel_regularizer=l2(self.hparams.l2_reg),
-                       padding='same',
-                       data_format='channels_first',
-                       use_bias=False,
-                       name=f'conv2d_{name}_2')(X)
-            X = BatchNormalization(axis=1, name=f'batchnorm_{name}_2')(X)
-            X = Add(name=f'combine_{name}')([_X, X])
-            X = Activation('relu', name=f'relu_{name}_2')(X)
-        return X
     
+if __name__ == '__main__':
+    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             'data',
+                             'models',
+                             'current', 'weights')
+    print(directory)
