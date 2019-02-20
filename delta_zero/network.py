@@ -14,6 +14,7 @@ from keras.optimizers import Adam
 from keras.regularizers import l2
 
 import numpy as np
+import tensorflow as tf
 
 from .utils import labels, dotdict
 
@@ -30,13 +31,13 @@ def_hparams = dotdict(
     l2_reg=1e-4
 )
 
-
-
 class INeuralNetwork(object, metaclass=ABCMeta):
 
     def __init__(self, name, hparams):
         self.name = name
         self.hparams = hparams
+        self.graph = tf.get_default_graph()
+        self.session = tf.Session(graph=self.graph)
         self.model = self.build()
         self.model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
                            optimizer=Adam(self.hparams.learning_rate))
@@ -82,141 +83,155 @@ class ChessNetwork(INeuralNetwork):
         super(ChessNetwork, self).__init__(name, def_hparams)
 
     def build(self):
-        X_in = X = Input(shape=(18, 8, 8))
-        X = Conv2D(filters=self.hparams.filters,
-                   kernel_size=self.hparams.input_kernel_size,
-                   strides=self.hparams.stride,
-                   kernel_regularizer=l2(self.hparams.l2_reg),
-                   padding='same',
-                   data_format='channels_first',
-                   use_bias=False,
-                   name='input_conv2d')(X)
-        X = BatchNormalization(axis=1, name='input_batchnorm')(X)
-        X = Activation('relu', name='input_relu')(X)
+        with self.graph.as_default():
+            with self.session.as_default():
+                X_in = X = Input(shape=(18, 8, 8))
+                X = Conv2D(filters=self.hparams.filters,
+                           kernel_size=self.hparams.input_kernel_size,
+                           strides=self.hparams.stride,
+                           kernel_regularizer=l2(self.hparams.l2_reg),
+                           padding='same',
+                           data_format='channels_first',
+                           use_bias=False,
+                           name='input_conv2d')(X)
+                X = BatchNormalization(axis=1, name='input_batchnorm')(X)
+                X = Activation('relu', name='input_relu')(X)
 
-        for i in range(self.hparams.n_residual_layers):
-            name = f'res{i}'
-            X = self._residual_layer(X, name)
+                for i in range(self.hparams.n_residual_layers):
+                    name = f'res{i}'
+                    X = self._residual_layer(X, name)
         
-        residuals = X
-        policy_head = self._policy_layer(X)
-        value_head = self._value_layer(X, residuals)
+                residuals = X
+                policy_head = self._policy_layer(X)
+                value_head = self._value_layer(X, residuals)
 
-        return Model(X_in, [policy_head, value_head], name=self.name)
+                return Model(X_in, [policy_head, value_head], name=self.name)
 
     def _value_layer(self, X, residuals):
-        X = Conv2D(filters=4,
-                   kernel_size=1,
-                   data_format='channels_first',
-                   kernel_regularizer=l2(self.hparams.l2_reg),
-                   use_bias=False,
-                   name='value_conv2d')(residuals)
-        X = BatchNormalization(axis=1, name='value_batchnorm')(X)
-        X = Activation('relu', name='value_relu')(X)
-        X = Flatten(name='value_flatten')(X)
-        X = Dense(self.hparams.fc_size, activation='relu', name='value_fc')(X)
-        X = Dense(1, activation='tanh', name='value_out')(X)
-        return X
+        with self.graph.as_default():
+            with self.session.as_default():
+        
+                X = Conv2D(filters=4,
+                           kernel_size=1,
+                           data_format='channels_first',
+                           kernel_regularizer=l2(self.hparams.l2_reg),
+                           use_bias=False,
+                           name='value_conv2d')(residuals)
+                X = BatchNormalization(axis=1, name='value_batchnorm')(X)
+                X = Activation('relu', name='value_relu')(X)
+                X = Flatten(name='value_flatten')(X)
+                X = Dense(self.hparams.fc_size, activation='relu', name='value_fc')(X)
+                X = Dense(1, activation='tanh', name='value_out')(X)
+                return X
 
     def _policy_layer(self, X):
-
-        X = Conv2D(filters=self.hparams.filters,
-                   kernel_regularizer=l2(self.hparams.l2_reg),
-                   kernel_size=1,
-                   padding='same',
-                   data_format='channels_first',
-                   use_bias=False,
-                   name='policy_conv2d')(X)
-        X = BatchNormalization(axis=1, name='policy_batchnorm')(X)
-        X = Activation('relu', name='policy_relu')(X)
-        X = Flatten(name='policy_flatten')(X)
-        X = Dense(len(labels), activation='softmax', name='policy_out')(X)
-        return X
+        with self.graph.as_default():
+            with self.session.as_default():
+        
+                X = Conv2D(filters=self.hparams.filters,
+                           kernel_regularizer=l2(self.hparams.l2_reg),
+                           kernel_size=1,
+                           padding='same',
+                           data_format='channels_first',
+                           use_bias=False,
+                           name='policy_conv2d')(X)
+                X = BatchNormalization(axis=1, name='policy_batchnorm')(X)
+                X = Activation('relu', name='policy_relu')(X)
+                X = Flatten(name='policy_flatten')(X)
+                X = Dense(len(labels), activation='softmax', name='policy_out')(X)
+                return X
 
         
     def _residual_layer(self, X, name):
-        _X = X
-        X = Conv2D(filters=self.hparams.filters,
-                   kernel_size=self.hparams.residual_kernel_size,
-                   kernel_regularizer=l2(self.hparams.l2_reg),
-                   padding='same',
-                   data_format='channels_first',
-                   use_bias=False,
-                   name=f'conv2d_{name}_1')(X)
-        X = BatchNormalization(axis=1, name=f'batchnorm_{name}_1')(X)
-        X = Activation('relu', name=f'relu_{name}_1')(X)
-        X = Conv2D(filters=self.hparams.filters,
-                   kernel_size=self.hparams.residual_kernel_size,
-                   kernel_regularizer=l2(self.hparams.l2_reg),
-                   padding='same',
-                   data_format='channels_first',
-                   use_bias=False,
-                   name=f'conv2d_{name}_2')(X)
-        X = BatchNormalization(axis=1, name=f'batchnorm_{name}_2')(X)
-        X = Add(name=f'combine_{name}')([_X, X])
-        X = Activation('relu', name=f'relu_{name}_2')(X)
+        with self.graph.as_default():
+            with self.session.as_default():
+        
+                _X = X
+                X = Conv2D(filters=self.hparams.filters,
+                           kernel_size=self.hparams.residual_kernel_size,
+                           kernel_regularizer=l2(self.hparams.l2_reg),
+                           padding='same',
+                           data_format='channels_first',
+                           use_bias=False,
+                           name=f'conv2d_{name}_1')(X)
+                X = BatchNormalization(axis=1, name=f'batchnorm_{name}_1')(X)
+                X = Activation('relu', name=f'relu_{name}_1')(X)
+                X = Conv2D(filters=self.hparams.filters,
+                           kernel_size=self.hparams.residual_kernel_size,
+                           kernel_regularizer=l2(self.hparams.l2_reg),
+                           padding='same',
+                           data_format='channels_first',
+                           use_bias=False,
+                           name=f'conv2d_{name}_2')(X)
+                X = BatchNormalization(axis=1, name=f'batchnorm_{name}_2')(X)
+                X = Add(name=f'combine_{name}')([_X, X])
+                X = Activation('relu', name=f'relu_{name}_2')(X)
             
-        return X
+                return X
 
     
     def train(self, examples):
-
-        state, target_pi, target_v = list(zip(*examples))
-        state = np.asarray(state)
-        target_pi = np.asarray(target_pi)
-        target_v = np.asarray(target_v)
-        self.model.fit(x=state,y=[target_pi, target_v],
-                       batch_size=self.hparams.batch_size,
-                       epochs=self.hparams.epochs)
+        with self.graph.as_default():
+            with self.session.as_default():
+                state, target_pi, target_v = list(zip(*examples))
+                state = np.asarray(state)
+                target_pi = np.asarray(target_pi)
+                target_v = np.asarray(target_v)
+                self.model.fit(x=state,y=[target_pi, target_v],
+                               batch_size=self.hparams.batch_size,
+                               epochs=self.hparams.epochs)
 
     def predict(self, state):
-
-        state = np.expand_dims(state, axis=0)
-        pi, v = self.model.predict(state)
-        return pi[0], v[0]
+        with self.graph.as_default():
+            with self.session.as_default():
+                state = np.expand_dims(state, axis=0)
+                pi, v = self.model.predict(state)
+                return pi[0], v[0]
 
     def save(self, ckpt=None):
-        print('Saving model...')
-        directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                 'data',
-                                 'models',
-                                 'current', 'weights')
+        with self.graph.as_default():
+            with self.session.as_default():
+                print('Saving model...')
+                directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                         'data',
+                                         'models',
+                                         'current', 'weights')
 
-        if not os.path.exists(directory):
-            os.makedirs(directory)
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
 
-        if ckpt is not None:
-            fn = f'{self.name + "_" + ckpt}_checkpoint.pth.tar'
-        else:
-            fn = f'{self.name}_def_checkpoint.pth.tar'
-        fn = os.path.join(directory, fn)
-        self.model.save_weights(fn)
-        print(f'Model saved to {fn}')
+                if ckpt is not None:
+                    fn = f'{self.name + "_" + ckpt}_checkpoint.pth.tar'
+                else:
+                    fn = f'{self.name}_def_checkpoint.pth.tar'
+                fn = os.path.join(directory, fn)
+                self.model.save_weights(fn)
+                print(f'Model saved to {fn}')
 
     def load(self, ckpt=None):
-        print(f'Attempting model load... ckpt: {ckpt}')
-        directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+        with self.graph.as_default():
+            with self.session.as_default():
+                print(f'Attempting model load... ckpt: {ckpt}')
+                directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                  'data',
                                  'models',
                                  'current', 'weights')
             
-        if ckpt is not None:
-            fn = f'{self.name + "_" + ckpt}_checkpoint.pth.tar'
-        else:
-            fn = f'{self.name}_def_checkpoint.pth.tar'
-        fn = os.path.join(directory, fn)
+                if ckpt is not None:
+                    fn = f'{self.name + "_" + ckpt}_checkpoint.pth.tar'
+                else:
+                    fn = f'{self.name}_def_checkpoint.pth.tar'
+                fn = os.path.join(directory, fn)
 
-        if not os.path.exists(fn):
-            raise ValueError(f'Could not load weights for model name: {self.name} : No checkpoint found.')
+                if not os.path.exists(fn):
+                    raise ValueError(f'Could not load weights for model name: {self.name} : No checkpoint found.')
 
-        self.model.load_weights(fn)
-        print(f'Model loaded from {fn}')
+                self.model.load_weights(fn)
+                print(f'Model loaded from {fn}')
     
 
     
 if __name__ == '__main__':
-    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                             'data',
-                             'models',
-                             'current', 'weights')
-    print(directory)
+    slist = list(range(10))
+    slist_np = np.asarray(slist)
+    print(np.asarray(slist_np))

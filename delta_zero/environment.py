@@ -1,5 +1,6 @@
 import copy
 import os
+import platform
 
 import chess
 import numpy as np
@@ -118,7 +119,7 @@ class ChessEnvironment(object):
         -------
             bool: True if the game is over, False otherwise
         '''
-        res = self.board.result(claim_draw=False) # claim_draw=True => Check 50 move rule
+        res = self.board.result(claim_draw=True) # claim_draw=True => Check 50 move rule
         if res != '*':
             if res == '1-0':
                 self._end_game(1)
@@ -130,11 +131,12 @@ class ChessEnvironment(object):
 
     def adjudicate(self):
 
+        current_os = platform.system()
         handler = uci.InfoHandler()
         ep = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                          'stockfish-10-win',
-                          'Windows',
-                          'stockfish_10_x64.exe')
+                          f'stockfish-10-{"win" if current_os == "Windows" else "linux"}',
+                          f'{current_os}',
+                          f'stockfish_10_x64{".exe" if current_os == "Windows" else ""}')
         engine = uci.popen_engine(ep)
         engine.info_handlers.append(handler)
         engine.position(self.board)

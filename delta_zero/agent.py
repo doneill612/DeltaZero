@@ -6,7 +6,7 @@ from .utils import dotdict
 
 def_params = dotdict(
     temp_threshold=10,
-    max_hmoves=250
+    max_hmoves=300
 )
 
 
@@ -17,7 +17,7 @@ class ChessAgent(object):
         self.search_tree = search_tree
         self.params = params
 
-    def play(self, verbose=False):
+    def play(self, verbose=False, sleep=False):
         '''
         Makes the agent play itself in a game of chess.
         '''
@@ -28,11 +28,12 @@ class ChessAgent(object):
             step += 1
             
             if step > self.params.max_hmoves:
-                print('Half move limit reached - adjudicating')
+                if verbose:
+                    print('Half move limit reached - adjudicating')
                 self.env.adjudicate()
                 continue
 
-            if step % 25 == 0:
+            if verbose and step % 25 == 0:
                 print(f'{step} half moves executed this game...')
             
             c_state = self.env.canonical_board_state
@@ -47,14 +48,16 @@ class ChessAgent(object):
             
             turn *= -1
             self.env.push_action(action)
-            if verbose:
-                print(f'Move played: {action}\n\n{self.env}')
-                time.sleep(2)
+            #if verbose:
+                #print(f'{"White" if not turn else "Black"} played: {action}\n\n{self.env}')
+                #if sleep:
+                   # time.sleep(2)
 
         res_val = self.env.result_value()
         print(f'\nGame result: {self.env.result_string()}')
         self.reset()
-        examples = [(ex[0], ex[2], res_val * ((-1)**(ex[1] != turn))) for ex in examples]
+        # examples form =>[... [numpy.ndarray, np.ndarray, int] ...]
+        examples = [[ex[0], ex[2], res_val * ((-1)**(ex[1] != turn))] for ex in examples]
         
         return examples
 

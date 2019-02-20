@@ -43,7 +43,7 @@ class MCTS(object):
             p = [0] * len(counts)
             p[best_action_idx] = 1
             res['a'] = best_action
-            res['pr'] = p
+            res['pr'] = np.asarray(p)
             return res
         else:
             counts = [c**(1. / temp) for c in counts]
@@ -51,7 +51,7 @@ class MCTS(object):
             if (self.params.resign_threshold and v > self.params.resign_threshold) \
                or not self.params.resign_threshold:
                 res['a'] = np.random.choice(labels, p=p)
-            res['pr'] = p
+            res['pr'] = np.asarray(p)
             return res
 
     def reset(self):
