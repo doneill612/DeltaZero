@@ -188,13 +188,14 @@ class ChessNetwork(INeuralNetwork):
                 pi, v = self.model.predict(state)
                 return pi[0], v[0]
 
-    def save(self, ckpt=None):
+    def save(self, version='nextgen', ckpt=None):
         with self.graph.as_default():
             with self.session.as_default():
                 print('Saving model...')
                 directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                          'data',
                                          'models',
+                                         f'{version}',
                                          'current', 'weights')
 
                 if not os.path.exists(directory):
@@ -208,14 +209,15 @@ class ChessNetwork(INeuralNetwork):
                 self.model.save_weights(fn)
                 print(f'Model saved to {fn}')
 
-    def load(self, ckpt=None):
+    def load(self, version='nextgen', ckpt=None):
         with self.graph.as_default():
             with self.session.as_default():
                 print(f'Attempting model load... ckpt: {ckpt}')
                 directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                 'data',
-                                 'models',
-                                 'current', 'weights')
+                                         'data',
+                                         'models',
+                                         f'{version}',
+                                         'current')
             
                 if ckpt is not None:
                     fn = f'{self.name + "_" + ckpt}_checkpoint.pth.tar'
