@@ -19,7 +19,7 @@ def train(net_name, version):
 
     train_examples = load_examples(net_name)
     network.train(train_examples)
-    network.save()
+    network.save(version=version)
         
     logger.info('Session complete')    
         
