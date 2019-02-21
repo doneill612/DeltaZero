@@ -10,6 +10,11 @@ logger = Logger.get_logger('training')
 
 def train(net_name, version):
 
+    if version not in ('current', 'nextgen'):
+        logger.fatal(f'Invalid version type: {version}. '
+                     'Must be "nextgen" or "current"')
+        raise AssertionError
+
     network = ChessNetwork(name=net_name)
     try:
         network.load(version=version)
