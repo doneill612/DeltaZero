@@ -18,7 +18,8 @@ def train(net_name, version):
     network = ChessNetwork(name=net_name)
     try:
         network.load(version=version)
-    except ValueError
+    except ValueError:
+        pass
 
     train_examples = load_examples(net_name)
     network.train(train_examples)

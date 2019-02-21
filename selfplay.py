@@ -46,7 +46,8 @@ class Runner(object):
         network = ChessNetwork(name=self.net_name)
         try:
             network.load(version=self.version)
-        except ValueError
+        except ValueError:
+            pass
             
 
         env = ChessEnvironment()
