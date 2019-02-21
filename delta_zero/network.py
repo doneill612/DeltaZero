@@ -95,11 +95,13 @@ class NeuralNetwork(object, metaclass=ABCMeta):
 
 
 import keras.backend as K
+
 from keras.engine import *
 from keras.layers import *
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.regularizers import l2
+
 import tensorflow as tf
 
 class ChessNetwork(NeuralNetwork):
@@ -134,13 +136,8 @@ class ChessNetwork(NeuralNetwork):
                 self.model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
                                    optimizer=Adam(self.hparams.learning_rate))
 
-    def copy(self):
-        import copy
-        return copy.deepcopy(self)
-
     def build(self):
-
-
+        
         with self.graph.as_default():
             with self.session.as_default():
                 X_in = X = Input(shape=(18, 8, 8))
@@ -206,7 +203,6 @@ class ChessNetwork(NeuralNetwork):
 
         with self.graph.as_default():
             with self.session.as_default():
-        
                 _X = X
                 X = Conv2D(filters=self.hparams.filters,
                            kernel_size=self.hparams.residual_kernel_size,
@@ -253,6 +249,7 @@ class ChessNetwork(NeuralNetwork):
                 return pi[0], v[0]
 
     def save(self, version):
+        
         with self.graph.as_default():
             with self.session.as_default():
                 logger.info('Saving model...')
@@ -270,7 +267,7 @@ class ChessNetwork(NeuralNetwork):
                 self.model.save_weights(fn)
                 logger.info(f'Model saved to {fn}')
 
-    def load(self, version='nextgen', ckpt=None):
+    def load(self, version='nextgen'):
         
         with self.graph.as_default():
             with self.session.as_default():
@@ -286,7 +283,8 @@ class ChessNetwork(NeuralNetwork):
 
                 if not os.path.exists(fn):
                     ex = f'Could not load weights for model name: {self.name} : No checkpoint found.'
-                    raise ValueError(ex)
+                    logger.warn(ex)
+                    raise ValueError
 
                 self.model.load_weights(fn)
                 logger.info(f'Model loaded from {fn}')

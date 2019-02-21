@@ -1,4 +1,5 @@
 import argparse
+import multiprocessing as mp
 import os
 
 from random import shuffle
@@ -12,7 +13,6 @@ from delta_zero.agent import ChessAgent
 from delta_zero.mcts import MCTS
 from delta_zero.logging import Logger
 
-
 logger = Logger.get_logger('selfplay')
 
 ray.init()
@@ -22,7 +22,7 @@ class Runner(object):
     '''
     A `ray` actor responsible for executing a single session of self-play.
     '''
-    def __init__(self, net_name, iteration, warm_start=None):
+    def __init__(self, net_name, iteration, version='nextgen'):
         '''
         Params
         ------
@@ -31,7 +31,7 @@ class Runner(object):
             warm_start (int): a warm-start version number to load the network from
         '''
         self.net_name = net_name
-        self.warm_start = warm_start
+        self.version = version
         self.iteration = iteration
 
     def run_selfplay(self):
@@ -45,11 +45,9 @@ class Runner(object):
         '''
         network = ChessNetwork(name=self.net_name)
         try:
-            if self.warm_start:
-                self.warm_start = str(self.warm_start)
-            network.load(ckpt=self.warm_start)
-        except ValueError as e:
-            logger.verbose(str(e))
+            network.load(version=self.version)
+        except ValueError
+            
 
         env = ChessEnvironment()
 
@@ -69,21 +67,20 @@ def main():
     Logger.set_log_level('info')
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('n_games', type=int,
-                        help='The number of games of self-play to train on '
-                             'in this session.')
     parser.add_argument('net_name', type=str,
                         help='The name of the network to use. If a saved network '
                              'with this name exists, it is loaded before executing '
                              'self-play.')
-    parser.add_argument('warm_start', nargs='?', type=int, help='Network version warm-start')
+    parser.add_argument('version', nargs='?', type=int, help='Network version to load - "current" or "nextgen"')
     
     args = parser.parse_args()
-    n_games = args.n_games
-    net_name = args.net_name
-    warm_start = args.warm_start
 
-    runners = [Runner.remote(net_name=net_name, iteration=i, warm_start=warm_start) for i in range(n_games)]
+    n_games = mp.cpu_count()
+    
+    net_name = args.net_name
+    version = args.version
+
+    runners = [Runner.remote(net_name=net_name, iteration=i, version=version) for i in range(n_games)]
     all_examples = []
     train_examples = ray.get([r.run_selfplay.remote() for r in runners])
     for ex in train_examples:
