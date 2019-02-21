@@ -31,16 +31,23 @@ def_hparams = dotdict(
     l2_reg=1e-4
 )
 
-class INeuralNetwork(object, metaclass=ABCMeta):
-
+class NeuralNetwork(object, metaclass=ABCMeta):
+    '''Abstract base class for neural networks in the context of DeltaZero.
+    
+    This provides a common interface for all potential neural network implementations,
+    independent of framework choice.
+    '''
     def __init__(self, name, hparams):
+        '''Constructs a neural network.
+        
+        Params
+        ------
+            name (str): The name of the network. Used for IO operations.
+            hparams (dict): The network hyperparameters.
+        '''
         self.name = name
         self.hparams = hparams
-        self.graph = tf.get_default_graph()
-        self.session = tf.Session(graph=self.graph)
         self.model = self.build()
-        self.model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
-                           optimizer=Adam(self.hparams.learning_rate))
         
     @abstractmethod
     def build(self):
@@ -52,14 +59,31 @@ class INeuralNetwork(object, metaclass=ABCMeta):
     @abstractmethod
     def train(self, examples):
         '''
-        Trains the neural network.
+        Trains the neural network on the provided examples.
+
+        According the AlphaZero paper, the neural network is responsible
+        for taking the board state as input and returning a policy vector
+        and scalar value estimation as output. Therefore, training examples
+        should be of the form,
+
+            (s; p, v), s := board state, p := policy vector, v := value
+
+        Params
+        ------
+            examples (array): A numpy.ndarray, or list, of training
+                              examples.
         '''
         raise NotImplementedError('train method must be implemented.')
 
     @abstractmethod
     def predict(self, state):
         '''
-        Makes a prediction given a board state.
+        Makes a (policy, value) prediction on given a board state.
+
+        Returns
+        -------
+            p (array): policy vector, numpy.ndarray
+            v (float): value
         '''
         raise NotImplementedError('predict method must be implemented.')
 
@@ -77,10 +101,34 @@ class INeuralNetwork(object, metaclass=ABCMeta):
         '''
         raise NotImplementedError('load method must be implemented.')
 
-class ChessNetwork(INeuralNetwork):
+class ChessNetwork(NeuralNetwork):
+    '''
+    A Keras implementation of the neural network architecture.
 
+    Architectural decisions follow very closely the approach outlined in the paper, with minor deviations.
+
+    The network body consists of:
+        - A linear rectified, batch normalized convolutional layer (RBCL) with filter size 256,
+          kernel size (3x3) and stride 1.
+        - 10 residual layers (as opposed to 19 in the original paper), each residual layer consisting
+          of two skip-connected RBCLs, each with filter size 256, kernel size (3x3) and stride 1.
+
+    The network body feeds a policy head and value head.
+        - The policy head is very different from the one used by AlphaZero, as AlphaZero represents
+          moves in a (73x8x8) matrix stack, while DeltaZero represents moves in a flat-array UCI format.
+          DeltaZero's policy head has a single RBCL with filter size 256, kernel size (1x1) and stride 1,
+          of which the output is flattened and passed to a linear rectified dense layer of 
+          size 1968 (number of possible moves in UCI notation on a chess board).
+        - The value head consists of a single RBCL with filter size 4, kernel size (1x1) and stride 1, a
+          linear rectified dense layer of size 256, and a tanh dense layer of size 1.
+    '''
     def __init__(self, name='delta_zero'):
         super(ChessNetwork, self).__init__(name, def_hparams)
+        self.graph = tf.get_default_graph()
+        self.session = tf.Session(graph=self.graph)
+        self.model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
+                           optimizer=Adam(self.hparams.learning_rate))
+
 
     def build(self):
         with self.graph.as_default():
@@ -231,9 +279,3 @@ class ChessNetwork(INeuralNetwork):
                 self.model.load_weights(fn)
                 print(f'Model loaded from {fn}')
     
-
-    
-if __name__ == '__main__':
-    slist = list(range(10))
-    slist_np = np.asarray(slist)
-    print(np.asarray(slist_np))

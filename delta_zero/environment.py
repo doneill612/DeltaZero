@@ -73,10 +73,6 @@ class ChessEnvironment(object):
         return self.board.turn
 
     @property
-    def fen(self):
-        return self.board.fen()
-
-    @property
     def canonical_board_state(self):
         '''
         Returns the board state from the POV of the current side
@@ -218,9 +214,18 @@ class ChessEnvironment(object):
         self.board = chess.Board()
 
     def copy(self):
+        '''
+        Returns a deep copy of this ChessEnvironment.
+        '''
         return copy.deepcopy(self)
 
     def to_string(self):
+        '''
+        Returns the canonical board state represented as a byte string.
+
+        Note that even though this method is called `to_string` and subsequently
+        calls numpy.tostring(), this method does indeed return `bytes`.
+        '''
         return self.canonical_board_state.tostring()
         
     def _end_game(self, winner):
@@ -299,6 +304,7 @@ class ChessEnvironment(object):
         if en_passant_sq != '-':
             r, f = self.sq_to_coord(en_passant_sq)
             auxiliary_planes[EPS][r][f] = 1
+            #auxiliary_planes[EPS] = np.flip(auxiliary_planes[EPS], axis=1)
                                   
         return auxiliary_planes
 
@@ -326,11 +332,36 @@ class ChessEnvironment(object):
         return list(self.board.pieces(ptype, pcolor))
 
     def sq_to_coord(self, sq):
+        '''
+        Given a square in algebreaic notation (i.e. "a8", "b3", "d1"),
+        return a (rank, file) tuple coordinate.
+        
+        Params
+        ------
+            sq (str): the board square in algebreaic notation
+        
+        Returns
+        -------
+            A tuple in the form (rank, file) corresponding to the supplied
+            square string.
+        '''
         r = 8 - int(sq[1])
         f = ord(sq[0]) - ord('a')
         return r, f
 
     def coord_to_sq(self, coord):
+        '''
+        Given a (rank, file) tuple coordinate, return a square 
+        in algebreaic notation (i.e. "a8", "b3", "d1").
+        
+        Params
+        ------
+            coord (tuple): a tuple in the form (rank, file) to convert
+                           to algebreaic notation
+        Returns
+        -------
+            The board square corresponding to the provided tuple.
+        '''
         return f"{chr(ord('a') + coord[1])}{str(8 - coord[0])}"
 
     def __repr__(self):
@@ -342,6 +373,8 @@ if __name__ == '__main__':
     env = ChessEnvironment()
     env.push_action('g2g4')
     env.push_action('e7e6')
-    env.adjudicate()
-    print(env.winner)
+    env.push_action('g4g5')
+    env.push_action('f7f5')
+    eps_plane = env.build_auxiliary_planes()[5]
+    print(eps_plane)
     
