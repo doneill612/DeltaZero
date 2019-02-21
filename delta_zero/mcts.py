@@ -5,7 +5,7 @@ from .utils import dotdict, labels
 EPS = 1e-8
 
 def_params = dotdict(
-    n_sims=5,
+    n_sims=100,
     cpuct=1.0,
     resign_threshold=-0.8,
 )

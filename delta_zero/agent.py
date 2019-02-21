@@ -1,12 +1,13 @@
-import numpy as np
-
+import random
 import time
+
+import numpy as np
 
 from .utils import dotdict
 
 def_params = dotdict(
     temp_threshold=10,
-    max_hmoves=300
+    max_hmoves=1000
 )
 
 
@@ -35,7 +36,7 @@ class ChessAgent(object):
         self.search_tree = search_tree
         self.params = params
 
-    def play(self, verbose=True, sleep=False):
+    def play(self, game_name=None)
         '''
         Makes the agent play itself in a game of chess.
         '''
@@ -63,7 +64,10 @@ class ChessAgent(object):
             self.env.push_action(action)
 
         res_val = self.env.result_value()
-        self.env.to_pgn(self.search_tree.network.name, 'test.txt')
+        if game_name is None:
+            game_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=N))
+            game_name += '.txt'
+        self.env.to_pgn(self.search_tree.network.name, game_name)
         self.reset()
         examples = [[ex[0], ex[2], res_val * ((-1)**(ex[1] != turn))] for ex in examples]
         

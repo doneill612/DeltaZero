@@ -6,13 +6,16 @@ from random import shuffle
 
 import numpy as np
 
-from delta_zero.utils import dotdict
 from delta_zero.network import ChessNetwork 
 from delta_zero.environment import ChessEnvironment
 from delta_zero.agent import ChessAgent
 from delta_zero.mcts import MCTS
+from delta_zero.logging import Logger
 
-def run(n_games, net_name, warm_start=None, max_workers=4, verbose=True):
+Logger.set_log_level('info')
+logger = Logger.get_logger('selfplay')
+
+def run(n_games, net_name, warm_start=None, max_workers=4):
     '''
     Runs self-play in a process pool. The results of all the games
     are saved to a .npy file.
@@ -25,27 +28,27 @@ def run(n_games, net_name, warm_start=None, max_workers=4, verbose=True):
     '''
     train_examples = []
     
-    with ProcessPoolExecutor(max_workers=4) as executor:
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
 
-        print('Process pool established...')
+        logger.info('Process pool established...')
 
         futures = []
         train_examples = []
-        for _ in range(n_games):
-            futures.append(executor.submit(selfplay_task, net_name, warm_start, verbose))
+        for i in range(n_games):
+            futures.append(executor.submit(selfplay_task, net_name, warm_start, i))
 
-        print(f'Playing {n_games} games...')
+        logger.info(f'Playing {n_games} games...')
         
         for i, future in enumerate(futures):
             train_examples.extend(future.result())
-            print(f'{i+1} game{"" if i <= 1 else "s"} finished...')
+            logger.info(f'{i+1} game{"" if i <= 1 else "s"} finished...')
 
-        print(f'All games complete. Generated {len(train_examples)} examples.')
+        logger.info(f'All games complete. Generated {len(train_examples)} examples.')
 
         shuffle(train_examples)
         save_train_examples(np.asarray(train_examples), net_name)
 
-def selfplay_task(net_name, warm_start, verbose=True):
+def selfplay_task(net_name, warm_start, i):
     '''
     Executes self-play task.
 
@@ -66,13 +69,12 @@ def selfplay_task(net_name, warm_start, verbose=True):
             warm_start = str(warm_start)
         network.load(ckpt=warm_start)
     except ValueError as e:
-        if verbose:
-            print(f'WARNING: {e}')
+        logger.warn(e)
 
     search_tree = MCTS(network)
     agent = ChessAgent(search_tree, env)
  
-    return agent.play(verbose=verbose)
+    return agent.play()
 
     
 def save_train_examples(train_examples, net_name, fn='train_set.npy'):
@@ -83,7 +85,7 @@ def save_train_examples(train_examples, net_name, fn='train_set.npy'):
                              'train')
     if not os.path.exists(train_dir):
         os.makedirs(train_dir)
-        print('Train directory created.')
+        logger.info('Train directory created.')
     fn = os.path.join(train_dir, fn)
     np.save(fn, train_examples)
     
@@ -98,12 +100,10 @@ if __name__ == '__main__':
                              'with this name exists, it is loaded before executing '
                              'self-play.')
     parser.add_argument('warm_start', nargs='?', type=int, help='Network version warm-start')
-    parser.add_argument('verbose', nargs='?', type=bool, help='Verbose logging enabled')
     
     args = parser.parse_args()
     n_games = args.n_games
     net_name = args.net_name
     warm_start = args.warm_start
-    verbose = args.verbose
 
-    run(n_games, net_name, warm_start=warm_start, verbose=verbose)
+    run(n_games, net_name, warm_start=warm_start)

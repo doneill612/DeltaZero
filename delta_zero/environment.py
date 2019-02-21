@@ -2,11 +2,15 @@ import copy
 import os
 import platform
 
+from datetime import datetime
+
 import chess
 import chess.pgn as pgn
 import numpy as np
 
 import chess.uci as uci
+
+from .logging import Logger
 
 PIECES = [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING] = range(1, 7)
 COLORS = [WHITE, BLACK] = [True, False]
@@ -18,6 +22,8 @@ RESULT = {
 }
 
 
+logger = Logger.get_logger('ChessEnvironment')
+    
 class ChessEnvironment(object):
     '''Represents the chess board.
 
@@ -36,7 +42,6 @@ class ChessEnvironment(object):
     Actions (chess moves) are represented in UCI notation, and are pushed to the board's
     move stack.
     '''
-
     
     def __init__(self, board=chess.Board()):
         '''
@@ -126,7 +131,7 @@ class ChessEnvironment(object):
                 self._end_game(0)
         return self.winner != None
 
-    def to_pgn(self, folder_name, file_name):
+    def to_pgn(self, folder_name, file_name, self_play_game=True, opponent_color=None, opponent=None):
         '''
         Exports the environment move stack to a .pgn file at the specified location.
 
@@ -140,13 +145,21 @@ class ChessEnvironment(object):
         if not os.path.exists(pgn_path):
             os.makedirs(pgn_path)
             
-        game = pgn.Game()
-        for m in self.board.move_stack:
-            game.add_variation(m)
-
+        game = pgn.Game.from_board(self.board)
+        game.headers['Event'] = 'Self-Play' if self_play_game else 'Nextgen Matchup'
+        game.headers['Site'] = 'Processor Land'
+        game.headers['Date'] = datetime.now()
+        if self_play_game:
+            game.headers['White'] = folder_name
+            game.headers['Black'] = folder_name
+        else:
+            if opponent_color is None or opponent is None:
+                raise ValueError('Must supply opponent color and name for non self-play games.')
+            game.headers['White'] = folder_name if opponent_color == -1 else opponent
+            game.headers['Black'] = opponent if opponent_color == -1 else folder_name
         exporter = pgn.FileExporter(open(os.path.join(pgn_path, file_name), 'w', encoding='utf-8'))
         game.accept(exporter)
-
+        logger.info(f'Game saved to data/{folder_name}/{file_name}')
 
     def adjudicate(self):
         '''
@@ -180,7 +193,7 @@ class ChessEnvironment(object):
             else:
                 self._end_game(0)
 
-    def push_action(self, action_uci, verbose=True):
+    def push_action(self, action_uci):
         '''
         Updates the internal board representation by pushing an "action" to the move stack.
 
@@ -190,11 +203,11 @@ class ChessEnvironment(object):
 
         '''
         if action_uci is not None:
+            logger.verbose(f'{"White" if self.white_to_move else "Black"} played: {action_uci}'
             self.board.push_uci(action_uci)
             
         else:
-            if verbose:
-                print(f'{"White" if self.white_to_move else "Black"} resigns.')
+            logger.verbose(f'{"White" if self.white_to_move else "Black"} resigns.')
             self._send_resignation()
 
     
@@ -204,7 +217,7 @@ class ChessEnvironment(object):
 
         The winner becomes the opposite of the side to move.
         '''
-        self._end_game(-1 if self.white_to_move else 0)
+        self._end_game(-1 if self.white_to_move else 1)
 
     def reset(self):
         '''
@@ -229,7 +242,9 @@ class ChessEnvironment(object):
         return self.canonical_board_state.tostring()
         
     def _end_game(self, winner):
-        self.winner = RESULT[winner]
+        res = RESULT[winner]
+        logger.verbose(res)
+        self.winner = res
 
     def result_side(self):
         '''
@@ -304,7 +319,6 @@ class ChessEnvironment(object):
         if en_passant_sq != '-':
             r, f = self.sq_to_coord(en_passant_sq)
             auxiliary_planes[EPS][r][f] = 1
-            #auxiliary_planes[EPS] = np.flip(auxiliary_planes[EPS], axis=1)
                                   
         return auxiliary_planes
 
@@ -373,8 +387,7 @@ if __name__ == '__main__':
     env = ChessEnvironment()
     env.push_action('g2g4')
     env.push_action('e7e6')
-    env.push_action('g4g5')
-    env.push_action('f7f5')
-    eps_plane = env.build_auxiliary_planes()[5]
-    print(eps_plane)
+    env.push_action('f2f4')
+    env.push_action('d8h4')
+    env.to_pgn('delta_zero', 'testpgn.txt')
     

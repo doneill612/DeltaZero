@@ -17,6 +17,7 @@ import numpy as np
 import tensorflow as tf
 
 from .utils import labels, dotdict
+from .logging import Logger
 
 def_hparams = dotdict(
     filters=256,
@@ -30,6 +31,8 @@ def_hparams = dotdict(
     epochs=3,
     l2_reg=1e-4
 )
+
+logger = Logger.get_logger('ChessNetwork')
 
 class NeuralNetwork(object, metaclass=ABCMeta):
     '''Abstract base class for neural networks in the context of DeltaZero.
@@ -239,7 +242,7 @@ class ChessNetwork(NeuralNetwork):
     def save(self, version='nextgen', ckpt=None):
         with self.graph.as_default():
             with self.session.as_default():
-                print('Saving model...')
+                logger.info('Saving model...')
                 directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                          'data',
                                          'models',
@@ -255,12 +258,12 @@ class ChessNetwork(NeuralNetwork):
                     fn = f'{self.name}_def_checkpoint.pth.tar'
                 fn = os.path.join(directory, fn)
                 self.model.save_weights(fn)
-                print(f'Model saved to {fn}')
+                logger.info(f'Model saved to {fn}')
 
     def load(self, version='nextgen', ckpt=None):
         with self.graph.as_default():
             with self.session.as_default():
-                print(f'Attempting model load... ckpt: {ckpt}')
+                logger.info(f'Attempting model load... ckpt: {ckpt}')
                 directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                          'data',
                                          'models',
@@ -274,8 +277,10 @@ class ChessNetwork(NeuralNetwork):
                 fn = os.path.join(directory, fn)
 
                 if not os.path.exists(fn):
-                    raise ValueError(f'Could not load weights for model name: {self.name} : No checkpoint found.')
+                    ex = f'Could not load weights for model name: {self.name} : No checkpoint found.'
+                    logger.fatal(ex)
+                    raise ValueError
 
                 self.model.load_weights(fn)
-                print(f'Model loaded from {fn}')
+                logger.info(f'Model loaded from {fn}')
     
