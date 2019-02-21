@@ -44,10 +44,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('net_name', type=str, help='Network name')
-    parser.add_argument('version', type=str, type=int, help='Network version to save as - "current" or "nextgen"')
+    parser.add_argument('version', type=str, help='Network version to save as - "current" or "nextgen"')
     
     args = parser.parse_args()
     net_name = args.net_name
     version = args.version
-    train(net_name, version=version, warm_start=warm_start)
+    train(net_name, version=version)
     

@@ -271,7 +271,7 @@ class ChessNetwork(NeuralNetwork):
         
         with self.graph.as_default():
             with self.session.as_default():
-                logger.info(f'Attempting model load... ckpt: {ckpt}')
+                logger.info(f'Attempting model load... (version: {version})')
                 directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                          'data',
                                          f'{self.name}',
