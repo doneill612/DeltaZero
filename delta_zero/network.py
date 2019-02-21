@@ -123,9 +123,9 @@ class ChessNetwork(NeuralNetwork):
           linear rectified dense layer of size 256, and a tanh dense layer of size 1.
     '''
     def __init__(self, name='delta_zero'):
-        super(ChessNetwork, self).__init__(name, def_hparams)
         self.graph = tf.get_default_graph()
         self.session = tf.Session(graph=self.graph)
+        super(ChessNetwork, self).__init__(name, def_hparams)
         self.model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
                            optimizer=Adam(self.hparams.learning_rate))
 
