@@ -129,7 +129,8 @@ class ChessEnvironment(object):
                 self._end_game(-1)
             else:
                 self._end_game(0)
-        return self.winner != None
+        game_over = self.winner != None
+        return game_over
 
     def to_pgn(self, folder_name, file_name, self_play_game=True, opponent_color=None, opponent=None):
         '''
@@ -157,6 +158,8 @@ class ChessEnvironment(object):
                 raise ValueError('Must supply opponent color and name for non self-play games.')
             game.headers['White'] = folder_name if opponent_color == -1 else opponent
             game.headers['Black'] = opponent if opponent_color == -1 else folder_name
+        if game.headers['Result'] == '*':
+            game.headers['Result'] == self.result_string()
         exporter = pgn.FileExporter(open(os.path.join(pgn_path, file_name), 'w', encoding='utf-8'))
         game.accept(exporter)
         logger.info(f'Game saved to data/{folder_name}/{file_name}')
@@ -166,6 +169,7 @@ class ChessEnvironment(object):
         Adjudicates the game in progress by performing a centipawn evaluation
         on the current position using Stockfish 10.
         '''
+        logger.info('Adjudicating game...')
         current_os = platform.system()
         handler = uci.InfoHandler()
         ep = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -203,7 +207,6 @@ class ChessEnvironment(object):
 
         '''
         if action_uci is not None:
-            logger.verbose(f'{"White" if self.white_to_move else "Black"} played: {action_uci}'
             self.board.push_uci(action_uci)
             
         else:
@@ -243,7 +246,6 @@ class ChessEnvironment(object):
         
     def _end_game(self, winner):
         res = RESULT[winner]
-        logger.verbose(res)
         self.winner = res
 
     def result_side(self):

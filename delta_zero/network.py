@@ -3,18 +3,7 @@ from datetime import datetime
 
 import os
 
-from keras.engine.topology import Input
-from keras.engine.training import Model
-from keras.layers.convolutional import Conv2D
-from keras.layers.normalization import BatchNormalization
-from keras.layers.merge import Add
-from keras.layers.core import Activation, Dense, Flatten
-from keras.models import Model
-from keras.optimizers import Adam
-from keras.regularizers import l2
-
 import numpy as np
-import tensorflow as tf
 
 from .utils import labels, dotdict
 from .logging import Logger
@@ -104,6 +93,15 @@ class NeuralNetwork(object, metaclass=ABCMeta):
         '''
         raise NotImplementedError('load method must be implemented.')
 
+
+import keras.backend as K
+from keras.engine import *
+from keras.layers import *
+from keras.models import Model
+from keras.optimizers import Adam
+from keras.regularizers import l2
+import tensorflow as tf
+
 class ChessNetwork(NeuralNetwork):
     '''
     A Keras implementation of the neural network architecture.
@@ -126,14 +124,23 @@ class ChessNetwork(NeuralNetwork):
           linear rectified dense layer of size 256, and a tanh dense layer of size 1.
     '''
     def __init__(self, name='delta_zero'):
-        self.graph = tf.get_default_graph()
+ 
+        self.graph = tf.Graph()
         self.session = tf.Session(graph=self.graph)
+        K.set_session(self.session)
         super(ChessNetwork, self).__init__(name, def_hparams)
-        self.model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
-                           optimizer=Adam(self.hparams.learning_rate))
+        with self.graph.as_default():
+            with self.session.as_default():
+                self.model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
+                                   optimizer=Adam(self.hparams.learning_rate))
 
+    def copy(self):
+        import copy
+        return copy.deepcopy(self)
 
     def build(self):
+
+
         with self.graph.as_default():
             with self.session.as_default():
                 X_in = X = Input(shape=(18, 8, 8))
@@ -155,10 +162,11 @@ class ChessNetwork(NeuralNetwork):
                 residuals = X
                 policy_head = self._policy_layer(X)
                 value_head = self._value_layer(X, residuals)
-
-                return Model(X_in, [policy_head, value_head], name=self.name)
+                model = Model(X_in, [policy_head, value_head], name=self.name)
+                return model
 
     def _value_layer(self, X, residuals):
+    
         with self.graph.as_default():
             with self.session.as_default():
         
@@ -176,6 +184,7 @@ class ChessNetwork(NeuralNetwork):
                 return X
 
     def _policy_layer(self, X):
+
         with self.graph.as_default():
             with self.session.as_default():
         
@@ -194,6 +203,7 @@ class ChessNetwork(NeuralNetwork):
 
         
     def _residual_layer(self, X, name):
+
         with self.graph.as_default():
             with self.session.as_default():
         
@@ -222,6 +232,7 @@ class ChessNetwork(NeuralNetwork):
 
     
     def train(self, examples):
+
         with self.graph.as_default():
             with self.session.as_default():
                 state, target_pi, target_v = list(zip(*examples))
@@ -233,6 +244,7 @@ class ChessNetwork(NeuralNetwork):
                                epochs=self.hparams.epochs)
 
     def predict(self, state):
+
         with self.graph.as_default():
             with self.session.as_default():
                 state = np.expand_dims(state, axis=0)
@@ -261,6 +273,7 @@ class ChessNetwork(NeuralNetwork):
                 logger.info(f'Model saved to {fn}')
 
     def load(self, version='nextgen', ckpt=None):
+        
         with self.graph.as_default():
             with self.session.as_default():
                 logger.info(f'Attempting model load... ckpt: {ckpt}')
@@ -278,7 +291,7 @@ class ChessNetwork(NeuralNetwork):
 
                 if not os.path.exists(fn):
                     ex = f'Could not load weights for model name: {self.name} : No checkpoint found.'
-                    logger.fatal(ex)
+                    logger.warn(ex)
                     raise ValueError
 
                 self.model.load_weights(fn)

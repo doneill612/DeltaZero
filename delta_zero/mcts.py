@@ -1,14 +1,19 @@
 import numpy as np
 
 from .utils import dotdict, labels
+from .logging import Logger
 
 EPS = 1e-8
 
 def_params = dotdict(
-    n_sims=100,
+    n_sims=5,
     cpuct=1.0,
+    alpha=0.3,
+    eps=0.25,
     resign_threshold=-0.8,
 )
+
+logger = Logger.get_logger('MCTS')
 
 class MCTS(object):
 
@@ -93,11 +98,16 @@ class MCTS(object):
         valids = self.v_s[s]
         cur_best = -float('inf')
         best_action_idx = -1
+        noise = np.random.dirichlet([self.params.alpha] * len(labels))
+
         for a_idx in range(len(labels)):
             if valids[a_idx]:
+                p_ = self.p_s[s][a_idx]
+                p_ = (1. - self.params.eps) * p_ + self.params.eps * \
+                     noise[a_idx]  
                 if (s, a_idx) in self.q_sa:
                     u = self.q_sa[(s, a_idx)] + self.params.cpuct * \
-                        self.p_s[s][a_idx] * np.sqrt(self.n_s[s]) / \
+                        p_  * np.sqrt(self.n_s[s]) / \
                         (1 + self.n_sa[(s, a_idx)])
                 else:
                     u = self.params.cpuct * self.p_s[s][a_idx] * \

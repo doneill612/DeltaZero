@@ -1,10 +1,10 @@
 import argparse
 import os
 
-from concurrent.futures import ProcessPoolExecutor
 from random import shuffle
 
 import numpy as np
+import ray
 
 from delta_zero.network import ChessNetwork 
 from delta_zero.environment import ChessEnvironment
@@ -12,86 +12,60 @@ from delta_zero.agent import ChessAgent
 from delta_zero.mcts import MCTS
 from delta_zero.logging import Logger
 
-Logger.set_log_level('info')
+
 logger = Logger.get_logger('selfplay')
 
-def run(n_games, net_name, warm_start=None, max_workers=4):
-    '''
-    Runs self-play in a process pool. The results of all the games
-    are saved to a .npy file.
+ray.init()
 
-    Params
-    ------
-        n_games (int): the number of games to play (parsed via argparse)
-        net_name (str): the network name (loaded if exists)
-        warm_start (int): the version of the network to load (optional)
-    '''
-    train_examples = []
-    
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+@ray.remote
+class Runner(object):
 
-        logger.info('Process pool established...')
+    def __init__(self, net_name, iteration, warm_start=None):
+        self.net_name = net_name
+        self.warm_start = warm_start
+        self.iteration = iteration
 
-        futures = []
-        train_examples = []
-        for i in range(n_games):
-            futures.append(executor.submit(selfplay_task, net_name, warm_start, i))
+    def run_selfplay(self):
+        '''
+        Executes a self-play task.
 
-        logger.info(f'Playing {n_games} games...')
-        
-        for i, future in enumerate(futures):
-            train_examples.extend(future.result())
-            logger.info(f'{i+1} game{"" if i <= 1 else "s"} finished...')
+        Establishes an Agent in an Environment and lets the Agent
+        play a full game of chess against itself.
 
-        logger.info(f'All games complete. Generated {len(train_examples)} examples.')
+        The resulting training examples are stored to a .npy file in a 
+        subdirectory below /data/ with the chosen name of the model.
+        '''
+        network = ChessNetwork(name=self.net_name)
+        try:
+            if self.warm_start:
+                self.warm_start = str(self.warm_start)
+            network.load(ckpt=self.warm_start)
+        except ValueError as e:
+            logger.verbose(str(e))
 
-        shuffle(train_examples)
-        save_train_examples(np.asarray(train_examples), net_name)
+        env = ChessEnvironment()
 
-def selfplay_task(net_name, warm_start, i):
-    '''
-    Executes self-play task.
+        search_tree = MCTS(network)
+        agent = ChessAgent(search_tree, env)
 
-    Establishes an Agent in an Environment and lets the Agent
-    play a full game of chess against itself.
-
-    Params
-    ------
-        n_games (int): the number of games to play (parsed via argparse)
-        net_name (str): the network name (loaded if exists)
-        warm_start (int): the version of the network to load (optional)
-    '''
-    env = ChessEnvironment()
-
-    network = ChessNetwork(name=net_name)
-    try:
-        if warm_start:
-            warm_start = str(warm_start)
-        network.load(ckpt=warm_start)
-    except ValueError as e:
-        logger.warn(e)
-
-    search_tree = MCTS(network)
-    agent = ChessAgent(search_tree, env)
- 
-    return agent.play()
-
-    
-def save_train_examples(train_examples, net_name, fn='train_set.npy'):
-    train_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+        train_examples = agent.play(game_name=f'{self.net_name}_game{self.iteration+1}')
+        train_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                              'delta_zero',
                              'data',
                              net_name,
                              'train')
-    if not os.path.exists(train_dir):
-        os.makedirs(train_dir)
-        logger.info('Train directory created.')
-    fn = os.path.join(train_dir, fn)
-    np.save(fn, train_examples)
+        if not os.path.exists(train_dir):
+            os.makedirs(train_dir)
+            logger.info('Train directory created.')
+        fn = os.path.join(train_dir, 'train_set.npy')
+        np.save(fn, train_examples)
+        logging.info('Game finished - training examples saved.')
     
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
 
+if __name__ == '__main__':
+    Logger.set_log_level('info')
+    
+    parser = argparse.ArgumentParser()
     parser.add_argument('n_games', type=int,
                         help='The number of games of self-play to train on '
                              'in this session.')
@@ -106,4 +80,6 @@ if __name__ == '__main__':
     net_name = args.net_name
     warm_start = args.warm_start
 
-    run(n_games, net_name, warm_start=warm_start)
+    runners = [Runner.remote(net_name=net_name, iteration=i, warm_start=warm_start) for i in range(n_games)]
+    ray.get([r.run_selfplay.remote() for r in runners])
+    

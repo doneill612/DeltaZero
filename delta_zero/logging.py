@@ -1,15 +1,15 @@
-class Logger(object):
-
-    LEVELS = {
-        'verbose': 0,
-        'info': 1,
-        'warning': 2,
-        'fatal': 3
+LEVELS = {
+        'verbose': 3,
+        'info': 2,
+        'warning': 1,
+        'fatal': 0
     }
 
-    LOGGERS = { }
+LOGGERS = { }
 
-    LOG_LEVEL = LEVELS['verbose']
+LOG_LEVEL = LEVELS['verbose']
+
+class Logger(object):    
     
     def __init__(self, loc, level):
         self.loc = loc
@@ -20,16 +20,16 @@ class Logger(object):
             print(f'<{self.loc}> [{display_level}]: {message}')
 
     def verbose(self, message):
-        self._log(0, 'DEBUG', message)
+        self._log(3, 'DEBUG', message)
 
     def info(self, message):
-        self._log(1, 'INFO', message)
+        self._log(2, 'INFO', message)
 
     def warn(self, message):
-        self._log(2, 'WARNING', message)
+        self._log(1, 'WARNING', message)
 
     def fatal(self, message):
-        self._log(3, 'FATAL', message)
+        self._log(0, 'FATAL', message)
 
     @staticmethod
     def get_logger(loc):
@@ -40,11 +40,20 @@ class Logger(object):
         else:
             return LOGGERS[loc]
 
-    @static
+    @staticmethod
     def set_log_level(level):
         if level not in LEVELS.keys():
             raise ValueError('invalid log level. '
                              f'valid levels: {list(LEVELS.keys())}')
         LOG_LEVEL = LEVELS[level]
+        print(f'Log level set to: {level}, {LOG_LEVEL}')
         for logger in LOGGERS.values():
             logger.level = LOG_LEVEL
+
+Logger.set_log_level('info')
+            
+if __name__ == '__main__':
+
+    print(LOG_LEVEL)
+    logger = Logger.get_logger('logging')
+    logger.verbose(logger.level)

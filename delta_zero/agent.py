@@ -4,12 +4,14 @@ import time
 import numpy as np
 
 from .utils import dotdict
+from .logging import Logger
 
 def_params = dotdict(
     temp_threshold=10,
-    max_hmoves=1000
+    max_hmoves=250
 )
 
+logger = Logger.get_logger('ChessAgent')
 
 class ChessAgent(object):
     '''Represents the learning Agent.
@@ -36,7 +38,7 @@ class ChessAgent(object):
         self.search_tree = search_tree
         self.params = params
 
-    def play(self, game_name=None)
+    def play(self, game_name):
         '''
         Makes the agent play itself in a game of chess.
         '''
@@ -49,9 +51,12 @@ class ChessAgent(object):
             if step > self.params.max_hmoves:
                 self.env.adjudicate()
                 continue
+
+            if step % 50 == 0:
+                logger.info(f'{step} half moves played in game {game_name}')
             
             c_state = self.env.canonical_board_state
-            temperature = int(step < self.params.temp_threshold)
+            temperature = 0 if step < self.params.temp_threshold else 0.995
 
             pi = self.search_tree.pi(self.env, temp=temperature)
             
@@ -64,10 +69,8 @@ class ChessAgent(object):
             self.env.push_action(action)
 
         res_val = self.env.result_value()
-        if game_name is None:
-            game_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=N))
-            game_name += '.txt'
         self.env.to_pgn(self.search_tree.network.name, game_name)
+        logger.info(f'Game over - result: {self.env.result_string()}')
         self.reset()
         examples = [[ex[0], ex[2], res_val * ((-1)**(ex[1] != turn))] for ex in examples]
         
