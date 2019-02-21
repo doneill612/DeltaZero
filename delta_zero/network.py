@@ -15,9 +15,9 @@ def_hparams = dotdict(
     stride=1,
     fc_size=256,
     n_residual_layers=10,
-    learning_rate=0.2,
+    learning_rate=0.01,
     batch_size=64,
-    epochs=3,
+    epochs=10,
     l2_reg=1e-4
 )
 
@@ -235,39 +235,37 @@ class ChessNetwork(NeuralNetwork):
 
         with self.graph.as_default():
             with self.session.as_default():
-                state, target_pi, target_v = list(zip(*examples))
-                state = np.asarray(state)
-                target_pi = np.asarray(target_pi)
-                target_v = np.asarray(target_v)
+                a_s = [np.asarray(ex) for ex in examples]
+                ex_np = np.concatenate(a_s)
+                state = np.array([s for s in ex_np[:, 0]])
+                target_pi = np.array([p for p in ex_np[:, 1]])
+                target_v = np.array([v for v in ex_np[:, 2]])
                 self.model.fit(x=state,y=[target_pi, target_v],
                                batch_size=self.hparams.batch_size,
                                epochs=self.hparams.epochs)
 
     def predict(self, state):
-
+                      
         with self.graph.as_default():
             with self.session.as_default():
                 state = np.expand_dims(state, axis=0)
                 pi, v = self.model.predict(state)
                 return pi[0], v[0]
 
-    def save(self, version='nextgen', ckpt=None):
+    def save(self, version):
         with self.graph.as_default():
             with self.session.as_default():
                 logger.info('Saving model...')
                 directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                          'data',
+                                         f'{self.name}',
                                          'models',
-                                         f'{version}',
-                                         'current', 'weights')
+                                         f'{version}')
 
                 if not os.path.exists(directory):
                     os.makedirs(directory)
-
-                if ckpt is not None:
-                    fn = f'{self.name + "_" + ckpt}_checkpoint.pth.tar'
-                else:
-                    fn = f'{self.name}_def_checkpoint.pth.tar'
+                
+                fn = f'{self.name}_checkpoint.pth.tar'
                 fn = os.path.join(directory, fn)
                 self.model.save_weights(fn)
                 logger.info(f'Model saved to {fn}')
@@ -279,20 +277,16 @@ class ChessNetwork(NeuralNetwork):
                 logger.info(f'Attempting model load... ckpt: {ckpt}')
                 directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                          'data',
+                                         f'{self.name}',
                                          'models',
-                                         f'{version}',
-                                         'current')
+                                         f'{version}')
             
-                if ckpt is not None:
-                    fn = f'{self.name + "_" + ckpt}_checkpoint.pth.tar'
-                else:
-                    fn = f'{self.name}_def_checkpoint.pth.tar'
+                fn = f'{self.name}_checkpoint.pth.tar'
                 fn = os.path.join(directory, fn)
 
                 if not os.path.exists(fn):
                     ex = f'Could not load weights for model name: {self.name} : No checkpoint found.'
-                    logger.warn(ex)
-                    raise ValueError
+                    raise ValueError(ex)
 
                 self.model.load_weights(fn)
                 logger.info(f'Model loaded from {fn}')

@@ -8,7 +8,7 @@ from .logging import Logger
 
 def_params = dotdict(
     temp_threshold=10,
-    max_hmoves=250
+    max_hmoves=300
 )
 
 logger = Logger.get_logger('ChessAgent')

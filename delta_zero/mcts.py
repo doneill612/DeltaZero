@@ -6,11 +6,11 @@ from .logging import Logger
 EPS = 1e-8
 
 def_params = dotdict(
-    n_sims=5,
+    n_sims=35,
     cpuct=1.0,
     alpha=0.3,
     eps=0.25,
-    resign_threshold=-0.8,
+    resign_threshold=-0.85,
 )
 
 logger = Logger.get_logger('MCTS')

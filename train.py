@@ -1,21 +1,27 @@
 import argparse
+import os
 
-from delta_zero.network import ChessNetwork 
+import numpy as np
 
-def train(net_name, version=None, warm_start=None):
+from delta_zero.network import ChessNetwork
+from delta_zero.logging import Logger
+
+logger = Logger.get_logger('training')
+
+def train(net_name, version):
 
     network = ChessNetwork(name=net_name)
     try:
-        network.load(ckpt=str(warm_start))
+        network.load(version=version)
     except ValueError as e:
-        print(f'WARNING: {e}')
+        logger.warn(f'WARNING: {e}')
 
 
     train_examples = load_examples(net_name)
     network.train(train_examples)
-    network.save(ckpt=str(version))
+    network.save()
         
-    print('Session complete')    
+    logger.info('Session complete')    
         
 
 def load_examples(net_name):
@@ -29,12 +35,15 @@ def load_examples(net_name):
 
     
 if __name__ == '__main__':
+    Logger.set_log_level('info')
+    
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('version', nargs='?', type=int, help='Network version to save as')
-    parser.add_argument('warm_start', nargs='?', type=int, help='Network version warm-start')
+    parser.add_argument('net_name', type=str, help='Network name')
+    parser.add_argument('version', type=str, type=int, help='Network version to save as - "current" or "nextgen"')
     
     args = parser.parse_args()
-    warm_start = args.warm_start
-    train( warm_start=warm_start)
+    net_name = args.net_name
+    version = args.version
+    train(net_name, version=version, warm_start=warm_start)
     
