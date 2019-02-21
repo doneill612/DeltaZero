@@ -59,7 +59,7 @@ class Runner(object):
             logger.info('Train directory created.')
         fn = os.path.join(train_dir, 'train_set.npy')
         np.save(fn, train_examples)
-        logging.info('Game finished - training examples saved.')
+        logger.info('Game finished - training examples saved.')
     
 
 if __name__ == '__main__':
