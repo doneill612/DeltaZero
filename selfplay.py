@@ -19,8 +19,17 @@ ray.init()
 
 @ray.remote
 class Runner(object):
-
+    '''
+    A `ray` actor responsible for executing a single session of self-play.
+    '''
     def __init__(self, net_name, iteration, warm_start=None):
+        '''
+        Params
+        ------
+            net_name (str): the name of the network to use
+            iteration (int): the game number in this self-play session
+            warm_start (int): a warm-start version number to load the network from
+        '''
         self.net_name = net_name
         self.warm_start = warm_start
         self.iteration = iteration
@@ -32,8 +41,7 @@ class Runner(object):
         Establishes an Agent in an Environment and lets the Agent
         play a full game of chess against itself.
 
-        The resulting training examples are stored to a .npy file in a 
-        subdirectory below /data/ with the chosen name of the model.
+        The resulting training examples are returned.
         '''
         network = ChessNetwork(name=self.net_name)
         try:
@@ -49,20 +57,15 @@ class Runner(object):
         agent = ChessAgent(search_tree, env)
 
         train_examples = agent.play(game_name=f'{self.net_name}_game{self.iteration+1}')
-        train_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                             'delta_zero',
-                             'data',
-                             net_name,
-                             'train')
-        if not os.path.exists(train_dir):
-            os.makedirs(train_dir)
-            logger.info('Train directory created.')
-        fn = os.path.join(train_dir, 'train_set.npy')
-        np.save(fn, train_examples)
-        logger.info('Game finished - training examples saved.')
+        logger.info(f'Game complete, generated {len(train_examples)} examples.')
+        return train_examples
     
 
-if __name__ == '__main__':
+def main():
+    '''
+    Utilizes all CPU cores to run self-play tasks.
+    The results of all the games are aggregated and saved to a training set .npy file.
+    '''
     Logger.set_log_level('info')
     
     parser = argparse.ArgumentParser()
@@ -81,5 +84,25 @@ if __name__ == '__main__':
     warm_start = args.warm_start
 
     runners = [Runner.remote(net_name=net_name, iteration=i, warm_start=warm_start) for i in range(n_games)]
-    ray.get([r.run_selfplay.remote() for r in runners])
+    all_examples = []
+    train_examples = ray.get([r.run_selfplay.remote() for r in runners])
+    for ex in train_examples:
+        all_examples.extend(ex)
+
+    all_examples = np.asarray(all_examples)
+
+    train_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             'delta_zero',
+                             'data',
+                             net_name,
+                             'train')
+    if not os.path.exists(train_dir):
+        os.makedirs(train_dir)
+        logger.info('Train directory created.')
+    fn = os.path.join(train_dir, 'train_set.npy')
+    np.save(fn, train_examples)
+    logger.info(f'Games finished - {len(all_examples)} training examples saved.')
+        
+if __name__ == '__main__':
+    main()
     
