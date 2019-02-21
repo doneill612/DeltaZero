@@ -15,21 +15,21 @@ class Logger(object):
         self.loc = loc
         self.level = level
 
-    def _log(self, level, message):
+    def _log(self, level, display_level, message):
         if self.level >= level:
-            print(f'<{self.loc}> [{level}]: {message}')
+            print(f'<{self.loc}> [{display_level}]: {message}')
 
     def verbose(self, message):
-        self._log('DEBUG', message)
+        self._log(0, 'DEBUG', message)
 
     def info(self, message):
-        self._log('INFO', message)
+        self._log(1, 'INFO', message)
 
     def warn(self, message):
-        self._log('WARNING', message)
+        self._log(2, 'WARNING', message)
 
     def fatal(self, message):
-        self._log('FATAL', message)
+        self._log(3, 'FATAL', message)
 
     @staticmethod
     def get_logger(loc):
