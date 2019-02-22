@@ -49,8 +49,6 @@ class Logger(object):
         print(f'Log level set to: {level}, {LOG_LEVEL}')
         for logger in LOGGERS.values():
             logger.level = LOG_LEVEL
-
-Logger.set_log_level('info')
             
 if __name__ == '__main__':
 

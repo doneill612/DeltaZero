@@ -20,9 +20,11 @@ class ChessAgent(object):
     make moves with the help of a Monte Carlo Tree Search + Neural Net
     system.
 
-    The `ChessAgent` exposes a single method caled `play()` which executes
-    a game of self-play and generates unsupervised training examples to
-    use in training the neural network supporting the MCTS.
+    The `ChessAgent` exposes two methods caled `play()` and `move()`. 
+    The former executes a game of self-play and generates supervised training 
+    examples to use in training the neural network supporting the MCTS.
+    The latter executes a single move in the environment. This is more useful
+    for evaluation during which an Agent plays against another opponent.
     '''
     def __init__(self, search_tree, env, params=def_params):
         '''
@@ -76,9 +78,17 @@ class ChessAgent(object):
         
         return examples
 
+    def move(self, game_name, version):
+        pi = self.search_tree.pi(self.env, temp=0.995)
+        action = pi['a']
+        evaluation = pi['v']
+        self.env.push_action(action)
+        logger.verbose(f'[{game_name}, {version}] Position evaluation: {evaluation}')
+
     def reset(self):
         '''
         Resets the state of this Agent - meaning a total environment and MCTS reset.
         '''
         self.env.reset()
         self.search_tree.reset()
+

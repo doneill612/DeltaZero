@@ -72,11 +72,11 @@ def main():
                         help='The name of the network to use. If a saved network '
                              'with this name exists, it is loaded before executing '
                              'self-play.')
-    parser.add_argument('version', nargs='?', type=int, help='Network version to load - "current" or "nextgen"')
+    parser.add_argument('version', nargs='?', type=str, help='Network version to load - "current" or "nextgen"')
     
     args = parser.parse_args()
 
-    n_games = mp.cpu_count()
+    n_games = 1
     
     net_name = args.net_name
     version = args.version

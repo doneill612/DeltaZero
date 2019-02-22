@@ -387,9 +387,12 @@ class ChessEnvironment(object):
 if __name__ == '__main__':
 
     env = ChessEnvironment()
-    env.push_action('g2g4')
-    env.push_action('e7e6')
-    env.push_action('f2f4')
-    env.push_action('d8h4')
-    env.to_pgn('delta_zero', 'testpgn.txt')
+    legal = np.asarray(env.legal_moves)
+    legal_mask = np.isin(labels, legal, assume_unique=True)
+    print(np.asarray(legal_mask * labels))
+#    env.push_action('g2g4')
+#    env.push_action('e7e6')
+#    env.push_action('f2f4')
+#    env.push_action('d8h4')
+#    env.to_pgn('delta_zero', 'testpgn.txt')
     

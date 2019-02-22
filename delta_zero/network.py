@@ -14,9 +14,9 @@ def_hparams = dotdict(
     residual_kernel_size=3,
     stride=1,
     fc_size=256,
-    n_residual_layers=10,
-    learning_rate=0.01,
-    batch_size=64,
+    n_residual_layers=15,
+    learning_rate=0.002,
+    batch_size=1024,
     epochs=10,
     l2_reg=1e-4
 )

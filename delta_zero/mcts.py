@@ -6,7 +6,7 @@ from .logging import Logger
 EPS = 1e-8
 
 def_params = dotdict(
-    n_sims=35,
+    n_sims=400,
     cpuct=1.0,
     alpha=0.3,
     eps=0.25,
@@ -74,11 +74,10 @@ class MCTS(object):
         c_state = env.canonical_board_state
         
         if s not in self.e_s:
-            self.e_s[s] = env.is_game_over
+            self.e_s[s] = int(env.is_game_over)
         if self.e_s[s] != 0:
             return -self.e_s[s]
 
-        
         if s not in self.p_s:
             self.p_s[s], v = self.network.predict(c_state)
             legal = np.asarray(env.legal_moves)
