@@ -1,3 +1,5 @@
+from tqdm import tqdm
+
 LEVELS = {
         'verbose': 3,
         'info': 2,
@@ -17,7 +19,7 @@ class Logger(object):
 
     def _log(self, level, display_level, message):
         if self.level >= level:
-            print(f'<{self.loc}> [{display_level}]: {message}')
+            tqdm.write(f'<{self.loc}> [{display_level}]: {message}')
 
     def verbose(self, message):
         self._log(3, 'DEBUG', message)
@@ -50,8 +52,3 @@ class Logger(object):
         for logger in LOGGERS.values():
             logger.level = LOG_LEVEL
             
-if __name__ == '__main__':
-
-    print(LOG_LEVEL)
-    logger = Logger.get_logger('logging')
-    logger.verbose(logger.level)

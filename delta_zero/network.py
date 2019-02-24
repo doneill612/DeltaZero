@@ -9,16 +9,15 @@ from .utils import labels, dotdict
 from .logging import Logger
 
 def_hparams = dotdict(
-    filters=256,
+    filters=64,
     input_kernel_size=3,
     residual_kernel_size=3,
     stride=1,
     fc_size=256,
-    n_residual_layers=15,
+    n_residual_layers=20,
     learning_rate=0.002,
-    batch_size=1024,
-    epochs=10,
-    l2_reg=1e-4
+    batch_size=2048,
+    epochs=10
 )
 
 logger = Logger.get_logger('ChessNetwork')
@@ -100,7 +99,6 @@ from keras.engine import *
 from keras.layers import *
 from keras.models import Model
 from keras.optimizers import Adam
-from keras.regularizers import l2
 
 import tensorflow as tf
 
@@ -113,8 +111,8 @@ class ChessNetwork(NeuralNetwork):
     The network body consists of:
         - A linear rectified, batch normalized convolutional layer (RBCL) with filter size 256,
           kernel size (3x3) and stride 1.
-        - 10 residual layers (as opposed to 19 in the original paper), each residual layer consisting
-          of two skip-connected RBCLs, each with filter size 256, kernel size (3x3) and stride 1.
+        - 20 residual layers, each residual layer consisting of two skip-connected RBCLs, 
+          each with filter size 256, kernel size (3x3) and stride 1.
 
     The network body feeds a policy head and value head.
         - The policy head is very different from the one used by AlphaZero, as AlphaZero represents
@@ -140,11 +138,10 @@ class ChessNetwork(NeuralNetwork):
         
         with self.graph.as_default():
             with self.session.as_default():
-                X_in = X = Input(shape=(18, 8, 8))
+                X_in = X = Input(shape=(19, 8, 8))
                 X = Conv2D(filters=self.hparams.filters,
                            kernel_size=self.hparams.input_kernel_size,
                            strides=self.hparams.stride,
-                           kernel_regularizer=l2(self.hparams.l2_reg),
                            padding='same',
                            data_format='channels_first',
                            use_bias=False,
@@ -166,11 +163,9 @@ class ChessNetwork(NeuralNetwork):
     
         with self.graph.as_default():
             with self.session.as_default():
-        
                 X = Conv2D(filters=4,
                            kernel_size=1,
                            data_format='channels_first',
-                           kernel_regularizer=l2(self.hparams.l2_reg),
                            use_bias=False,
                            name='value_conv2d')(residuals)
                 X = BatchNormalization(axis=1, name='value_batchnorm')(X)
@@ -186,7 +181,6 @@ class ChessNetwork(NeuralNetwork):
             with self.session.as_default():
         
                 X = Conv2D(filters=self.hparams.filters,
-                           kernel_regularizer=l2(self.hparams.l2_reg),
                            kernel_size=1,
                            padding='same',
                            data_format='channels_first',
@@ -206,7 +200,6 @@ class ChessNetwork(NeuralNetwork):
                 _X = X
                 X = Conv2D(filters=self.hparams.filters,
                            kernel_size=self.hparams.residual_kernel_size,
-                           kernel_regularizer=l2(self.hparams.l2_reg),
                            padding='same',
                            data_format='channels_first',
                            use_bias=False,
@@ -215,7 +208,6 @@ class ChessNetwork(NeuralNetwork):
                 X = Activation('relu', name=f'relu_{name}_1')(X)
                 X = Conv2D(filters=self.hparams.filters,
                            kernel_size=self.hparams.residual_kernel_size,
-                           kernel_regularizer=l2(self.hparams.l2_reg),
                            padding='same',
                            data_format='channels_first',
                            use_bias=False,
@@ -238,7 +230,8 @@ class ChessNetwork(NeuralNetwork):
                 target_v = np.array([v for v in ex_np[:, 2]])
                 self.model.fit(x=state,y=[target_pi, target_v],
                                batch_size=self.hparams.batch_size,
-                               epochs=self.hparams.epochs)
+                               epochs=self.hparams.epochs,
+                               shuffle=True) # extra shuffling
 
     def predict(self, state):
                       

@@ -1,5 +1,7 @@
 import numpy as np
 
+from tqdm import tqdm
+
 from .utils import dotdict, labels
 from .logging import Logger
 
@@ -29,9 +31,9 @@ class MCTS(object):
 
     def pi(self, env, temp):
 
-        sim_vs = []
-        for i in range(self.params.n_sims):
-            sim_vs.append(self._search(env))
+        sim_vs = np.zeros(shape=(self.params.n_sims))
+        for i in tqdm(range(self.params.n_sims)):
+            sim_vs[i] = self._search(env)
 
         v = np.max(sim_vs)
 
@@ -83,6 +85,7 @@ class MCTS(object):
             legal = np.asarray(env.legal_moves)
             legal_mask = np.isin(labels, legal, assume_unique=True)
             self.p_s[s] = self.p_s[s] * legal_mask
+            
             sum_p_s_s = np.sum(self.p_s[s])
             if sum_p_s_s > 0:
                 self.p_s[s] /= sum_p_s_s
@@ -132,9 +135,4 @@ class MCTS(object):
 
         self.n_s[s] += 1
         return -v
-        
-                         
-            
-
-        
         

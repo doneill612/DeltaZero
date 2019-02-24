@@ -100,9 +100,9 @@ class ChessEnvironment(object):
     def board_state(self):
         '''
         Stacks the piece planes and auxiliary planes into a single
-        (18, 8, 8) array. 
+        (19, 8, 8) array. 
 
-        This (18, 8, 8) array represents the chess board state from white's POV.
+        This (19, 8, 8) array represents the chess board state from white's POV.
 
         Returns
         -------
@@ -300,12 +300,12 @@ class ChessEnvironment(object):
     def build_auxiliary_planes(self):
         '''
         Builds a (6, 8, 8) representation of auxiliary
-        information (castling rights, en-passant square, fifty-move rule)
+        information (castling rights, en-passant square, fifty-move rule, side to move)
         about the current chess board.
         '''
-        [KSC_WHITE, QSC_WHITE, KSC_BLACK, QSC_BLACK, FIFTY_MOVE, EPS] = range(6)
+        [KSC_WHITE, QSC_WHITE, KSC_BLACK, QSC_BLACK, FIFTY_MOVE, EPS, SIDE] = range(7)
         
-        auxiliary_planes = np.zeros(shape=(6, 8, 8), dtype=np.int32)
+        auxiliary_planes = np.zeros(shape=(7, 8, 8), dtype=np.int32)
         fen = self.board.fen()
         splits = fen.split(' ')
 
@@ -321,6 +321,12 @@ class ChessEnvironment(object):
         if en_passant_sq != '-':
             r, f = self.sq_to_coord(en_passant_sq)
             auxiliary_planes[EPS][r][f] = 1
+
+        side = int(self.white_to_move)
+        if side == 0:
+            side = -1
+
+        auxiliary_planes[SIDE] = side
                                   
         return auxiliary_planes
 
@@ -383,16 +389,3 @@ class ChessEnvironment(object):
     def __repr__(self):
         return str(self.board)
             
-
-if __name__ == '__main__':
-
-    env = ChessEnvironment()
-    legal = np.asarray(env.legal_moves)
-    legal_mask = np.isin(labels, legal, assume_unique=True)
-    print(np.asarray(legal_mask * labels))
-#    env.push_action('g2g4')
-#    env.push_action('e7e6')
-#    env.push_action('f2f4')
-#    env.push_action('d8h4')
-#    env.to_pgn('delta_zero', 'testpgn.txt')
-    
