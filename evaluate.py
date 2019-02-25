@@ -42,7 +42,7 @@ class Runner(object):
                         'play against blank slate version.')
 
         mcts_params = dotdict(
-            n_sims=55,
+            n_sims=10,
             cpuct=1.0,
             alpha=0.3,
             eps=0.25,

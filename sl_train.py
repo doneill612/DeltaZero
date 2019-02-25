@@ -17,6 +17,12 @@ logger = Logger.get_logger('supervised-learning')
 def train(net_name):
     
     network = ChessNetwork(net_name)
+
+    try:
+        network.load(version='current')
+    except ValueError:
+        pass
+    
     state, target_pi, target_v = load_sl_examples()
 
     # manually recreate network.train(), as the examples
@@ -25,7 +31,8 @@ def train(net_name):
         with network.session.as_default():
             network.model.fit(state, [target_pi, target_v],
                               batch_size=network.hparams.batch_size,
-                              epochs=network.hparams.epochs)
+                              epochs=network.hparams.epochs,
+			      shuffle=True)
 
     network.save(version='current')
 
@@ -34,18 +41,21 @@ def load_sl_examples():
                              'delta_zero',
                              'data',
                              'supervised_learning')
-    fn = os.path.join(directory, 'Kasparov.pgn')
+    fn = os.path.join(directory, 'Ehlvest.pgn')
     game = pgn.read_game(open(fn))
 
     env = ChessEnvironment()
     exs = []
     with open(fn, 'r', encoding="ISO-8859-1") as pgn_file:
         data = pgn_file.read()
-        splits = data.split('\n\n')
-        for i in tqdm(range(0, len(splits), 2)):
-            sio = io.StringIO(f'{splits[i]}\n\n{splits[i+1]}')
-            exs.append(extract_game_examples(pgn.read_game(sio), env))
-
+        splits = iter(data.split('\n\n'))
+        for header, game in tqdm(zip(splits, splits), desc=fn):
+            sio = io.StringIO(f'{header}\n\n{game}')
+            e = extract_game_examples(pgn.read_game(sio), env)
+            if len(e[0].shape) != 4:
+                continue
+            exs.append(e)
+            
     state, target_pi, target_v = list(zip(*exs))
 
     state = np.concatenate([s for s in state])

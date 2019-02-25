@@ -33,7 +33,7 @@ class MCTS(object):
 
         sim_vs = np.zeros(shape=(self.params.n_sims))
         for i in tqdm(range(self.params.n_sims)):
-            sim_vs[i] = self._search(env)
+            sim_vs[i] = self._search(env.copy())
 
         v = np.max(sim_vs)
 
@@ -70,8 +70,7 @@ class MCTS(object):
         self.v_s = {}
         
     def _search(self, env):
-
-        env = env.copy()
+        
         s = env.to_string()
         c_state = env.canonical_board_state
         
@@ -113,7 +112,7 @@ class MCTS(object):
                         (1 + self.n_sa[(s, a_idx)])
                 else:
                     u = self.params.cpuct * self.p_s[s][a_idx] * \
-                        np.sqrt(self.n_s[s] + EPS)
+                        p_ * np.sqrt(self.n_s[s] + EPS)
                 if u > cur_best:
                     cur_best = u
                     best_action_idx = a_idx
