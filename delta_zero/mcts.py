@@ -8,10 +8,10 @@ from .logging import Logger
 EPS = 1e-8
 
 def_params = dotdict(
-    n_sims=400,
-    cpuct=1.0,
-    alpha=0.3,
-    eps=0.25,
+    n_sims=100,
+    cpuct=4.0,
+    alpha=0.0,
+    eps=0.0,
     resign_threshold=-0.85,
 )
 
@@ -20,6 +20,7 @@ logger = Logger.get_logger('MCTS')
 class MCTS(object):
 
     def __init__(self, network, params=def_params):
+        self.ofcount = 0
         self.network = network
         self.params = params
         self.q_sa = {}
@@ -32,7 +33,7 @@ class MCTS(object):
     def pi(self, env, temp):
 
         sim_vs = np.zeros(shape=(self.params.n_sims))
-        for i in tqdm(range(self.params.n_sims)):
+        for i in tqdm(range(self.params.n_sims), desc='simulating'):
             sim_vs[i] = self._search(env.copy())
 
         v = np.max(sim_vs)
@@ -54,7 +55,14 @@ class MCTS(object):
             return res
         else:
             counts = [c**(1. / temp) for c in counts]
-            p = [c / float(sum(counts)) for c in counts]
+            if sum(counts) > 0:
+                p = [c / float(sum(counts)) for c in counts]
+            else:
+                logger.info('0 counts')
+                legal = env.legal_moves
+                n_legal = len(legal)
+                p = np.isin(labels, legal, assume_unique=True) * labels
+                p = p / n_legal
             if (self.params.resign_threshold and v > self.params.resign_threshold) \
                or not self.params.resign_threshold:
                 res['a'] = np.random.choice(labels, p=p)
@@ -62,6 +70,7 @@ class MCTS(object):
             return res
 
     def reset(self):
+        self.ofcount = 0
         self.q_sa = {}
         self.n_sa = {}
         self.n_s = {}
@@ -86,9 +95,14 @@ class MCTS(object):
             self.p_s[s] = self.p_s[s] * legal_mask
             
             sum_p_s_s = np.sum(self.p_s[s])
+            if sum_p_s_s < 0.001:
+                self.ofcount += 1
+                logger.verbose(f'Possible overfit... count: {self.ofcount}')
+                
             if sum_p_s_s > 0:
                 self.p_s[s] /= sum_p_s_s
             else:
+                
                 self.p_s[s] = self.p_s[s] + legal_mask
                 self.p_s[s] /= np.sum(self.p_s[s])
 
@@ -116,7 +130,7 @@ class MCTS(object):
                 if u > cur_best:
                     cur_best = u
                     best_action_idx = a_idx
-
+                    
         best_action = labels[best_action_idx]
 
         env.push_action(best_action)

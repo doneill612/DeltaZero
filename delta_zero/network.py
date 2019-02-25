@@ -9,15 +9,17 @@ from .utils import labels, dotdict
 from .logging import Logger
 
 def_hparams = dotdict(
-    filters=64,
+    body_filters=64,
+    policy_filters=8,
     input_kernel_size=3,
     residual_kernel_size=3,
     stride=1,
     fc_size=256,
-    n_residual_layers=20,
+    n_residual_layers=10,
     learning_rate=0.001,
-    batch_size=2048,
-    epochs=10
+    batch_size=1024,
+    epochs=15,
+    dropout=0.3
 )
 
 logger = Logger.get_logger('ChessNetwork')
@@ -126,7 +128,9 @@ class ChessNetwork(NeuralNetwork):
     def __init__(self, name='delta_zero'):
  
         self.graph = tf.Graph()
-        self.session = tf.Session(graph=self.graph)
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        self.session = tf.Session(graph=self.graph, config=config)
         K.set_session(self.session)
         super(ChessNetwork, self).__init__(name, def_hparams)
         with self.graph.as_default():
@@ -139,7 +143,7 @@ class ChessNetwork(NeuralNetwork):
         with self.graph.as_default():
             with self.session.as_default():
                 X_in = X = Input(shape=(19, 8, 8))
-                X = Conv2D(filters=self.hparams.filters,
+                X = Conv2D(filters=self.hparams.body_filters,
                            kernel_size=self.hparams.input_kernel_size,
                            strides=self.hparams.stride,
                            padding='same',
@@ -163,15 +167,16 @@ class ChessNetwork(NeuralNetwork):
     
         with self.graph.as_default():
             with self.session.as_default():
-                X = Conv2D(filters=4,
+                X = Conv2D(filters=1,
                            kernel_size=1,
                            data_format='channels_first',
                            use_bias=False,
                            name='value_conv2d')(residuals)
                 X = BatchNormalization(axis=1, name='value_batchnorm')(X)
                 X = Activation('relu', name='value_relu')(X)
-                X = Flatten(name='value_flatten')(X)
+                X = Flatten()(X)
                 X = Dense(self.hparams.fc_size, activation='relu', name='value_fc')(X)
+                X = Dropout(self.hparams.dropout)(X)
                 X = Dense(1, activation='tanh', name='value_out')(X)
                 return X
 
@@ -180,7 +185,7 @@ class ChessNetwork(NeuralNetwork):
         with self.graph.as_default():
             with self.session.as_default():
         
-                X = Conv2D(filters=self.hparams.filters,
+                X = Conv2D(filters=self.hparams.policy_filters,
                            kernel_size=1,
                            padding='same',
                            data_format='channels_first',
@@ -188,7 +193,9 @@ class ChessNetwork(NeuralNetwork):
                            name='policy_conv2d')(X)
                 X = BatchNormalization(axis=1, name='policy_batchnorm')(X)
                 X = Activation('relu', name='policy_relu')(X)
-                X = Flatten(name='policy_flatten')(X)
+                X = Flatten()(X)
+                X = Dense(2048, activation='relu', name='fcp')(X)
+                X = Dropout(self.hparams.dropout)(X)
                 X = Dense(len(labels), activation='softmax', name='policy_out')(X)
                 return X
 
@@ -198,7 +205,7 @@ class ChessNetwork(NeuralNetwork):
         with self.graph.as_default():
             with self.session.as_default():
                 _X = X
-                X = Conv2D(filters=self.hparams.filters,
+                X = Conv2D(filters=self.hparams.body_filters,
                            kernel_size=self.hparams.residual_kernel_size,
                            padding='same',
                            data_format='channels_first',
@@ -206,7 +213,7 @@ class ChessNetwork(NeuralNetwork):
                            name=f'conv2d_{name}_1')(X)
                 X = BatchNormalization(axis=1, name=f'batchnorm_{name}_1')(X)
                 X = Activation('relu', name=f'relu_{name}_1')(X)
-                X = Conv2D(filters=self.hparams.filters,
+                X = Conv2D(filters=self.hparams.body_filters,
                            kernel_size=self.hparams.residual_kernel_size,
                            padding='same',
                            data_format='channels_first',
@@ -231,7 +238,7 @@ class ChessNetwork(NeuralNetwork):
                 self.model.fit(x=state,y=[target_pi, target_v],
                                batch_size=self.hparams.batch_size,
                                epochs=self.hparams.epochs,
-                               shuffle=True) # extra shuffling
+                               shuffle=True, validation_split=0.2) # extra shuffling
 
     def predict(self, state):
                       

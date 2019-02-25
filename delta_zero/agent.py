@@ -78,8 +78,8 @@ class ChessAgent(object):
         
         return examples
 
-    def move(self, game_name, version):
-        pi = self.search_tree.pi(self.env, temp=0.995)
+    def move(self, game_name, version=None, temp=0.995):
+        pi = self.search_tree.pi(self.env, temp=temp)
         action = pi['a']
         evaluation = pi['v']
         self.env.push_action(action)

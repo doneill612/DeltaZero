@@ -9,7 +9,7 @@ LEVELS = {
 
 LOGGERS = { }
 
-LOG_LEVEL = LEVELS['verbose']
+LOG_LEVEL = LEVELS['info']
 
 class Logger(object):    
     

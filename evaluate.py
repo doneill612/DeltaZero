@@ -42,8 +42,8 @@ class Runner(object):
                         'play against blank slate version.')
 
         mcts_params = dotdict(
-            n_sims=10,
-            cpuct=1.0,
+            n_sims=100,
+            cpuct=4.0,
             alpha=0.3,
             eps=0.25,
             resign_threshold=-0.85,
@@ -54,8 +54,13 @@ class Runner(object):
 
         env = ChessEnvironment()
 
-        c_version = ChessAgent(c_mcts, env)
-        ng_version = ChessAgent(ng_mcts, env)
+        agent_params = dotdict(
+            temp_threshold=0,
+            max_hmoves=100
+        )
+
+        c_version = ChessAgent(c_mcts, env, params=agent_params)
+        ng_version = ChessAgent(ng_mcts, env, params=agent_params)
         
         self.play_game(c_version, ng_version, env)
 
@@ -111,5 +116,4 @@ def main():
     ray.get([r.run_evaluation.remote() for r in runners])
 
 if __name__ == '__main__':
-    Logger.set_log_level('info')
     main()
