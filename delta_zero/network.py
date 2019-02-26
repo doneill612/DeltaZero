@@ -10,16 +10,17 @@ from .logging import Logger
 
 def_hparams = dotdict(
     body_filters=64,
-    policy_filters=8,
+    policy_filters=32,
     input_kernel_size=3,
     residual_kernel_size=3,
     stride=1,
     fc_size=256,
-    n_residual_layers=10,
-    learning_rate=0.001,
-    batch_size=1024,
+    n_residual_layers=15,
+    learning_rate=0.002,
+    batch_size=512,
     epochs=15,
-    dropout=0.3
+    dropout=0.45,
+    l2_reg=1e-4
 )
 
 logger = Logger.get_logger('ChessNetwork')
@@ -101,6 +102,7 @@ from keras.engine import *
 from keras.layers import *
 from keras.models import Model
 from keras.optimizers import Adam
+from keras.regularizers import l2
 
 import tensorflow as tf
 
@@ -109,21 +111,7 @@ class ChessNetwork(NeuralNetwork):
     A Keras implementation of the neural network architecture.
 
     Architectural decisions follow very closely the approach outlined in the paper, with minor deviations.
-
-    The network body consists of:
-        - A linear rectified, batch normalized convolutional layer (RBCL) with filter size 256,
-          kernel size (3x3) and stride 1.
-        - 20 residual layers, each residual layer consisting of two skip-connected RBCLs, 
-          each with filter size 256, kernel size (3x3) and stride 1.
-
-    The network body feeds a policy head and value head.
-        - The policy head is very different from the one used by AlphaZero, as AlphaZero represents
-          moves in a (73x8x8) matrix stack, while DeltaZero represents moves in a flat-array UCI format.
-          DeltaZero's policy head has a single RBCL with filter size 256, kernel size (1x1) and stride 1,
-          of which the output is flattened and passed to a linear rectified dense layer of 
-          size 1968 (number of possible moves in UCI notation on a chess board).
-        - The value head consists of a single RBCL with filter size 4, kernel size (1x1) and stride 1, a
-          linear rectified dense layer of size 256, and a tanh dense layer of size 1.
+    Once a stable architecutre is found it will be described in a markdown file in this directory.
     '''
     def __init__(self, name='delta_zero'):
  
@@ -207,6 +195,7 @@ class ChessNetwork(NeuralNetwork):
                 _X = X
                 X = Conv2D(filters=self.hparams.body_filters,
                            kernel_size=self.hparams.residual_kernel_size,
+                           kernel_regularizer=l2(self.hparams.l2_reg),
                            padding='same',
                            data_format='channels_first',
                            use_bias=False,
@@ -215,6 +204,7 @@ class ChessNetwork(NeuralNetwork):
                 X = Activation('relu', name=f'relu_{name}_1')(X)
                 X = Conv2D(filters=self.hparams.body_filters,
                            kernel_size=self.hparams.residual_kernel_size,
+                           kernel_regularizer=l2(self.hparams.l2_reg),
                            padding='same',
                            data_format='channels_first',
                            use_bias=False,

@@ -8,10 +8,12 @@ from .logging import Logger
 EPS = 1e-8
 
 def_params = dotdict(
-    n_sims=100,
-    cpuct=4.0,
-    alpha=0.0,
-    eps=0.0,
+    n_sims=800,
+    cpuct=8.0,
+    c_base=4.0,
+    c_init=1.0,
+    alpha=0.3,
+    eps=0.10,
     resign_threshold=-0.85,
 )
 
@@ -30,10 +32,13 @@ class MCTS(object):
         self.e_s = {}
         self.v_s = {}        
 
-    def pi(self, env, temp):
+    def pi(self, env, temp, sims=None):
 
-        sim_vs = np.zeros(shape=(self.params.n_sims))
-        for i in tqdm(range(self.params.n_sims), desc='simulating'):
+        if sims is None:
+            sims = self.params.n_sims
+        sim_vs = np.zeros(shape=(sims))
+
+        for i in tqdm(range(sims), desc=logger.info('simulating', as_str=True)):
             sim_vs[i] = self._search(env.copy())
 
         v = np.max(sim_vs)
@@ -77,6 +82,9 @@ class MCTS(object):
         self.p_s = {}
         self.e_s = {}
         self.v_s = {}
+
+    def _c_puct(self, s):
+        return np.log((1 + self.n_s[s] + self.params.c_base) / self.params.c_base) + self.params.c_init
         
     def _search(self, env):
         
@@ -114,18 +122,18 @@ class MCTS(object):
         cur_best = -float('inf')
         best_action_idx = -1
         noise = np.random.dirichlet([self.params.alpha] * len(labels))
-
+        c = self.params.cpuct
         for a_idx in range(len(labels)):
             if valids[a_idx]:
                 p_ = self.p_s[s][a_idx]
                 p_ = (1. - self.params.eps) * p_ + self.params.eps * \
                      noise[a_idx]  
                 if (s, a_idx) in self.q_sa:
-                    u = self.q_sa[(s, a_idx)] + self.params.cpuct * \
+                    u = self.q_sa[(s, a_idx)] + c * \
                         p_  * np.sqrt(self.n_s[s]) / \
                         (1 + self.n_sa[(s, a_idx)])
                 else:
-                    u = self.params.cpuct * self.p_s[s][a_idx] * \
+                    u = c * self.p_s[s][a_idx] * \
                         p_ * np.sqrt(self.n_s[s] + EPS)
                 if u > cur_best:
                     cur_best = u

@@ -16,9 +16,7 @@ logger = Logger.get_logger('supervised-learning')
 
 def train_gen(net_name):
     network = ChessNetwork(net_name)
-    est = EarlyStopping('val_loss', min_delta=0.15, patience=2)
-    esv = EarlyStopping('val_value_out_loss', min_delta=0.01, patience=3)
-
+    est = EarlyStopping('val_loss', min_delta=0.05, patience=3)
     try:
         network.load(version='current')
     except ValueError:
@@ -30,7 +28,7 @@ def train_gen(net_name):
                 network.model.fit(state, [target_pi, target_v],
                                   batch_size=network.hparams.batch_size,
                                   epochs=network.hparams.epochs,
-			          shuffle=True, validation_split=0.2, callbacks=[est, esv])
+			          shuffle=True, validation_split=0.2, callbacks=[est])
 
                 network.save(version='current')
 
@@ -53,14 +51,16 @@ def example_gen():
             splits = iter(data.split('\n\n'))
             it = 0
             for header, game in zip(splits, splits):
-                it += 1
                 if it >= 2000:
                     break
                 sio = io.StringIO(f'{header}\n\n{game}')
                 e = extract_game_examples(pgn.read_game(sio), env)
+                if e == 'draw':
+                    continue
                 if len(e[0].shape) != 4:
                     continue
                 exs.append(e)
+                it += 1
             
             state, target_pi, target_v = list(zip(*exs))
 
@@ -89,7 +89,7 @@ def extract_game_examples(game, env):
         
         res = game.headers['Result']
         if res.split('-')[0] == '1/2':
-            v = 0
+            return 'draw'
         elif res.split('-')[0] == '1':
             v = 1
         else:

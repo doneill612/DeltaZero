@@ -8,7 +8,7 @@ from .logging import Logger
 
 def_params = dotdict(
     temp_threshold=10,
-    max_hmoves=300
+    max_hmoves=50
 )
 
 logger = Logger.get_logger('ChessAgent')
@@ -78,8 +78,8 @@ class ChessAgent(object):
         
         return examples
 
-    def move(self, game_name, version=None, temp=0.995):
-        pi = self.search_tree.pi(self.env, temp=temp)
+    def move(self, game_name, version=None, temp=0.995, sims=100):
+        pi = self.search_tree.pi(self.env, temp=temp, sims=sims)
         action = pi['a']
         evaluation = pi['v']
         self.env.push_action(action)

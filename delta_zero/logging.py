@@ -21,16 +21,29 @@ class Logger(object):
         if self.level >= level:
             tqdm.write(f'<{self.loc}> [{display_level}]: {message}')
 
-    def verbose(self, message):
-        self._log(3, 'DEBUG', message)
+    def _log_str(self, level, display_level, message):
+        if self.level >= level:
+            return f'<{self.loc}> [{display_level}]: {message}'
 
-    def info(self, message):
+    def verbose(self, message, as_str=False):
+        if as_str:
+            return self._log_str(3, 'DEBUG', message)
+        self._log(3, 'DEBUG', message)
+            
+
+    def info(self, message, as_str=False):
+        if as_str:
+            return self._log_str(2, 'INFO', message)
         self._log(2, 'INFO', message)
 
-    def warn(self, message):
+    def warn(self, message, as_str=False):
+        if as_str:
+            return self._log_str(1, 'WARNING', message)
         self._log(1, 'WARNING', message)
 
-    def fatal(self, message):
+    def fatal(self, message, as_str=False):
+        if as_str:
+            return self._log_str(0, 'FATAL', message)
         self._log(0, 'FATAL', message)
 
     @staticmethod
