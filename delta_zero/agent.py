@@ -1,7 +1,10 @@
+import os
 import random
 import time
 
 import numpy as np
+
+import chess.polyglot as book
 
 from .utils import dotdict
 from .logging import Logger
@@ -58,7 +61,7 @@ class ChessAgent(object):
                 logger.info(f'{step} half moves played in game {game_name}')
             
             c_state = self.env.canonical_board_state
-            temperature = 0 if step < self.params.temp_threshold else 0.995
+            temperature = step < self.params.temp_threshold
 
             pi = self.search_tree.pi(self.env, temp=temperature)
             
@@ -78,12 +81,21 @@ class ChessAgent(object):
         
         return examples
 
-    def move(self, game_name, version=None, temp=0.995, sims=100):
-        pi = self.search_tree.pi(self.env, temp=temp, sims=sims)
-        action = pi['a']
-        evaluation = pi['v']
+    def move(self, use_book=False, temp=True):
+        if use_book:
+            bfp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               'data', 'polyglot', 'Performance.bin')
+
+            with book.open_reader(bfp) as reader:
+                es = reader.find_all(self.env.board)
+                actions = np.asarray([e.move().uci() for e in es])
+                action = actions[0]
+        else:
+            pi = self.search_tree.pi(self.env, temp=temp)
+            action = pi['a']
+        
         self.env.push_action(action)
-        logger.verbose(f'[{game_name}, {version}] Position evaluation: {evaluation}')
+        
 
     def reset(self):
         '''

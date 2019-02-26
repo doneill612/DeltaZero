@@ -16,7 +16,7 @@ def_hparams = dotdict(
     stride=1,
     fc_size=256,
     n_residual_layers=15,
-    learning_rate=0.002,
+    learning_rate=0.0002,
     batch_size=512,
     epochs=15,
     dropout=0.45,
@@ -115,11 +115,15 @@ class ChessNetwork(NeuralNetwork):
     '''
     def __init__(self, name='delta_zero'):
  
+
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9,
+                                    allow_growth=True)
+        config = tf.ConfigProto(gpu_options=gpu_options)
+        
         self.graph = tf.Graph()
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
         self.session = tf.Session(graph=self.graph, config=config)
         K.set_session(self.session)
+
         super(ChessNetwork, self).__init__(name, def_hparams)
         with self.graph.as_default():
             with self.session.as_default():

@@ -15,6 +15,7 @@ def_params = dotdict(
     alpha=0.3,
     eps=0.10,
     resign_threshold=-0.85,
+    temperature=0.775
 )
 
 logger = Logger.get_logger('MCTS')
@@ -50,7 +51,7 @@ class MCTS(object):
 
         res['v'] = v
         
-        if temp == 0:
+        if not temp:
             best_action_idx = np.argmax(counts)
             best_action = labels[best_action_idx]
             p = [0] * len(counts)
@@ -59,7 +60,7 @@ class MCTS(object):
             res['pr'] = np.asarray(p)
             return res
         else:
-            counts = [c**(1. / temp) for c in counts]
+            counts = [c**(1. / self.params.temperature) for c in counts]
             if sum(counts) > 0:
                 p = [c / float(sum(counts)) for c in counts]
             else:
@@ -122,7 +123,7 @@ class MCTS(object):
         cur_best = -float('inf')
         best_action_idx = -1
         noise = np.random.dirichlet([self.params.alpha] * len(labels))
-        c = self.params.cpuct
+        c = self._c_puct(s)
         for a_idx in range(len(labels)):
             if valids[a_idx]:
                 p_ = self.p_s[s][a_idx]
