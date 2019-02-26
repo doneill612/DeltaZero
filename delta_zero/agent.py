@@ -6,12 +6,13 @@ import numpy as np
 
 import chess.polyglot as book
 
-from .utils import dotdict
+from .utils import dotdict, labels
 from .logging import Logger
 
 def_params = dotdict(
     temp_threshold=10,
-    max_hmoves=50
+    max_hmoves=50,
+    n_book_moves=5,
 )
 
 logger = Logger.get_logger('ChessAgent')
@@ -51,8 +52,9 @@ class ChessAgent(object):
         step = 0
         turn = 1
         while not self.env.is_game_over:
+
             step += 1
-            
+
             if step > self.params.max_hmoves:
                 self.env.adjudicate()
                 continue
@@ -62,16 +64,22 @@ class ChessAgent(object):
             
             c_state = self.env.canonical_board_state
             temperature = step < self.params.temp_threshold
-
-            pi = self.search_tree.pi(self.env, temp=temperature)
             
-            examples.append([c_state, turn, pi['pr']])
- 
-            action = pi['a']
-            evaluation = pi['v']
+            use_book = step <= self.params.n_book_moves * 2
+
+            if use_book:
+                action = self._get_book_move(step)
+                pr = np.ones(shape=len(labels)) * np.isin(labels, action, assume_unique=True).astype(np.int32)
+                examples.append([c_state, turn, pr])
+            else:
+                pi = self.search_tree.pi(self.env, temp=temperature)
+                action = pi['a']
+                examples.append([c_state, turn, pi['pr']])
+            
+            self.env.push_action(action)
             
             turn *= -1
-            self.env.push_action(action)
+
 
         res_val = self.env.result_value()
         self.env.to_pgn(self.search_tree.network.name, game_name)
@@ -81,15 +89,9 @@ class ChessAgent(object):
         
         return examples
 
-    def move(self, use_book=False, temp=True):
+    def move(self, step, use_book=False, temp=True):
         if use_book:
-            bfp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                               'data', 'polyglot', 'Performance.bin')
-
-            with book.open_reader(bfp) as reader:
-                es = reader.find_all(self.env.board)
-                actions = np.asarray([e.move().uci() for e in es])
-                action = actions[0]
+            action = self._get_book_move(step)
         else:
             pi = self.search_tree.pi(self.env, temp=temp)
             action = pi['a']
@@ -104,3 +106,15 @@ class ChessAgent(object):
         self.env.reset()
         self.search_tree.reset()
 
+    def _get_book_move(self, step):
+         bfp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               'data', 'polyglot', 'Performance.bin')
+
+         with book.open_reader(bfp) as reader:
+             es = reader.find_all(self.env.board)
+             actions = np.asarray([e.move().uci() for e in es])
+             if step == 1:
+                 action = np.random.choice(actions)
+             else:
+                 action = actions[0]
+             return action
