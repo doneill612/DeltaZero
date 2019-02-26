@@ -9,13 +9,11 @@ EPS = 1e-8
 
 def_params = dotdict(
     n_sims=800,
-    cpuct=8.0,
     c_base=4.0,
     c_init=1.0,
-    alpha=0.3,
     eps=0.10,
     resign_threshold=-0.85,
-    temperature=0.775
+    temperature=0.175
 )
 
 logger = Logger.get_logger('MCTS')
@@ -35,10 +33,13 @@ class MCTS(object):
 
     def pi(self, env, temp, sims=None):
 
+        self._alpha(env)
+
         if sims is None:
             sims = self.params.n_sims
         sim_vs = np.zeros(shape=(sims))
 
+        
         for i in tqdm(range(sims), desc=logger.info('simulating', as_str=True)):
             sim_vs[i] = self._search(env.copy())
 
@@ -86,6 +87,15 @@ class MCTS(object):
 
     def _c_puct(self, s):
         return np.log((1 + self.n_s[s] + self.params.c_base) / self.params.c_base) + self.params.c_init
+
+    def _alpha(self, env):
+        n = len(env.legal_moves)
+        if n <= 10:
+            return 0.3
+        if n > 10 and n <= 40:
+            return 0.15
+        if n > 40:
+            return 0.03
         
     def _search(self, env):
         
@@ -106,12 +116,11 @@ class MCTS(object):
             sum_p_s_s = np.sum(self.p_s[s])
             if sum_p_s_s < 0.001:
                 self.ofcount += 1
-                logger.verbose(f'Possible overfit... count: {self.ofcount}')
+                logger.info(f'Possible overfit... count: {self.ofcount}')
                 
             if sum_p_s_s > 0:
                 self.p_s[s] /= sum_p_s_s
-            else:
-                
+            else:                
                 self.p_s[s] = self.p_s[s] + legal_mask
                 self.p_s[s] /= np.sum(self.p_s[s])
 
@@ -122,7 +131,7 @@ class MCTS(object):
         valids = self.v_s[s]
         cur_best = -float('inf')
         best_action_idx = -1
-        noise = np.random.dirichlet([self.params.alpha] * len(labels))
+        noise = np.random.dirichlet([self._alpha(env)] * len(labels))
         c = self._c_puct(s)
         for a_idx in range(len(labels)):
             if valids[a_idx]:
@@ -134,8 +143,7 @@ class MCTS(object):
                         p_  * np.sqrt(self.n_s[s]) / \
                         (1 + self.n_sa[(s, a_idx)])
                 else:
-                    u = c * self.p_s[s][a_idx] * \
-                        p_ * np.sqrt(self.n_s[s] + EPS)
+                    u = c *  p_ * np.sqrt(self.n_s[s] + EPS)
                 if u > cur_best:
                     cur_best = u
                     best_action_idx = a_idx

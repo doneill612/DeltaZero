@@ -15,11 +15,11 @@ def_hparams = dotdict(
     residual_kernel_size=3,
     stride=1,
     fc_size=256,
-    n_residual_layers=15,
-    learning_rate=0.0002,
-    batch_size=512,
-    epochs=15,
-    dropout=0.45,
+    n_residual_layers=10,
+    learning_rate=0.001,
+    batch_size=128,
+    epochs=10,
+    dropout=0.4,
     l2_reg=1e-4
 )
 
@@ -224,6 +224,8 @@ class ChessNetwork(NeuralNetwork):
 
         with self.graph.as_default():
             with self.session.as_default():
+                es = EarlyStopping('val_loss', min_delta=0.05, patience=3)
+                
                 a_s = [np.asarray(ex) for ex in examples]
                 ex_np = np.concatenate(a_s)
                 state = np.array([s for s in ex_np[:, 0]])
@@ -232,7 +234,9 @@ class ChessNetwork(NeuralNetwork):
                 self.model.fit(x=state,y=[target_pi, target_v],
                                batch_size=self.hparams.batch_size,
                                epochs=self.hparams.epochs,
-                               shuffle=True, validation_split=0.2) # extra shuffling
+                               shuffle=True, validation_split=0.2,
+                               callbacks=[es]) # extra shuffling
+    
 
     def predict(self, state):
                       

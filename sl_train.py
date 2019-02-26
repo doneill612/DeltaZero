@@ -16,7 +16,7 @@ logger = Logger.get_logger('supervised-learning')
 
 def train_gen(net_name):
     network = ChessNetwork(net_name)
-    est = EarlyStopping('val_loss', min_delta=0.05, patience=3)
+    est = EarlyStopping('val_loss', min_delta=0.005, patience=3)
     try:
         network.load(version='current')
     except ValueError:
@@ -107,7 +107,7 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('net_name', type=str)
+    parser.add_argument('--netname', dest='net_name', type=str)
 
     args = parser.parse_args()
     net_name = args.net_name

@@ -91,9 +91,9 @@ class ChessEnvironment(object):
             np.ndarray: The board state from the POV of the current side to play.
         '''
         state = self.board_state
-        if not self.white_to_move:
-            for i, plane in enumerate(state):
-                state[i] = np.rot90(plane, k=2)
+        #if not self.white_to_move:
+        #    for i, plane in enumerate(state):
+        #        state[i] = np.rot90(plane, k=2)
         return state
 
     @property
@@ -299,7 +299,7 @@ class ChessEnvironment(object):
         
     def build_auxiliary_planes(self):
         '''
-        Builds a (6, 8, 8) representation of auxiliary
+        Builds a (7, 8, 8) representation of auxiliary
         information (castling rights, en-passant square, fifty-move rule, side to move)
         about the current chess board.
         '''
