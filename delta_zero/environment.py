@@ -15,6 +15,15 @@ from .logging import Logger
 PIECES = [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING] = range(1, 7)
 COLORS = [WHITE, BLACK] = [True, False]
 
+UNICODE_PIECE_SYMBOLS = {
+    "R": u"♖", "r": u"♜",
+    "N": u"♘", "n": u"♞",
+    "B": u"♗", "b": u"♝",
+    "Q": u"♕", "q": u"♛",
+    "K": u"♔", "k": u"♚",
+    "P": u"♙", "p": u"♟",
+}
+
 RESULT = {
     0  : {'side': 'Draw', 'res': '1/2-1/2', 'key': 0},
     1  : {'side': 'White', 'res': '1-0', 'key': 1},
@@ -387,5 +396,8 @@ class ChessEnvironment(object):
         return f"{chr(ord('a') + coord[1])}{str(8 - coord[0])}"
 
     def __repr__(self):
-        return str(self.board)
+        rep = str(self.board)
+        for k, v in UNICODE_PIECE_SYMBOLS.items():
+            rep = rep.replace(k, UNICODE_PIECE_SYMBOLS[k.lower() if k.isupper() else k.upper()])
+        return rep
             

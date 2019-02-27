@@ -13,13 +13,16 @@ def_params = dotdict(
     c_init=1.0,
     eps=0.10,
     resign_threshold=-0.85,
-    temperature=0.175
+    temperature=0.175,
+    use_noise=True
 )
 
 logger = Logger.get_logger('MCTS')
 
 class MCTS(object):
+    '''
 
+    '''
     def __init__(self, network, params=def_params):
         self.ofcount = 0
         self.network = network
@@ -116,7 +119,7 @@ class MCTS(object):
             sum_p_s_s = np.sum(self.p_s[s])
             if sum_p_s_s < 0.001:
                 self.ofcount += 1
-                logger.info(f'Possible overfit... count: {self.ofcount}')
+                logger.verbose(f'Possible overfit... count: {self.ofcount}')
                 
             if sum_p_s_s > 0:
                 self.p_s[s] /= sum_p_s_s
@@ -136,8 +139,9 @@ class MCTS(object):
         for a_idx in range(len(labels)):
             if valids[a_idx]:
                 p_ = self.p_s[s][a_idx]
-                p_ = (1. - self.params.eps) * p_ + self.params.eps * \
-                     noise[a_idx]  
+                if self.params.use_noise:
+                    p_ = (1. - self.params.eps) * p_ + self.params.eps * \
+                         noise[a_idx]  
                 if (s, a_idx) in self.q_sa:
                     u = self.q_sa[(s, a_idx)] + c * \
                         p_  * np.sqrt(self.n_s[s]) / \

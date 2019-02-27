@@ -280,10 +280,14 @@ class ChessNetwork(NeuralNetwork):
                 fn = os.path.join(directory, fn)
 
                 if not os.path.exists(fn):
-                    ex = f'Could not load weights for model name: {self.name} : No checkpoint found.'
+                    ex = f'Could not load weights for model name: {self.name} => No checkpoint found.'
                     logger.warn(ex)
                     raise ValueError
 
-                self.model.load_weights(fn)
+                try:
+                    self.model.load_weights(fn)
+                except:
+                    logger.fatal(f'Could not load weights for model name: {self.name} => Network architecture mismatch.')
+                    raise ValueError
                 logger.info(f'Model loaded from {fn}')
     

@@ -11,7 +11,7 @@ from .logging import Logger
 
 def_params = dotdict(
     temp_threshold=10,
-    max_hmoves=50,
+    max_hmoves=500,
     n_book_moves=5,
 )
 
@@ -70,8 +70,13 @@ class ChessAgent(object):
             if use_book:
                 action = self._get_book_move(step)
                 pr = np.ones(shape=len(labels)) * np.isin(labels, action, assume_unique=True).astype(np.int32)
-                examples.append([c_state, turn, pr])
+                if action is not None:
+                    examples.append([c_state, turn, pr])
             else:
+                pi = self.search_tree.pi(self.env, temp=temperature)
+                action = pi['a']
+                examples.append([c_state, turn, pi['pr']])
+            if action is None:
                 pi = self.search_tree.pi(self.env, temp=temperature)
                 action = pi['a']
                 examples.append([c_state, turn, pi['pr']])
@@ -95,7 +100,9 @@ class ChessAgent(object):
         else:
             pi = self.search_tree.pi(self.env, temp=temp)
             action = pi['a']
-        
+        if action is None:
+            pi = self.search_tree.pi(self.env, temp=temp)
+            action = pi['a']
         self.env.push_action(action)
         
 
@@ -113,8 +120,10 @@ class ChessAgent(object):
          with book.open_reader(bfp) as reader:
              es = reader.find_all(self.env.board)
              actions = np.asarray([e.move().uci() for e in es])
-             if step == 1:
-                 action = np.random.choice(actions)
-             else:
-                 action = actions[0]
+             action = None
+             if len(actions) > 0:
+                 if step == 1:
+                     action = np.random.choice(actions)
+                 else:
+                     action = actions[0]
              return action
