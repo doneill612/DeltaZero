@@ -42,8 +42,8 @@ class MCTS(object):
             sims = self.params.n_sims
         sim_vs = np.zeros(shape=(sims))
 
-        
-        for i in tqdm(range(sims), desc=logger.info('simulating', as_str=True)):
+        logger.info(f'Running {sims} simulations...')
+        for i in range(sims):
             sim_vs[i] = self._search(env.copy())
 
         v = np.max(sim_vs)
@@ -89,7 +89,8 @@ class MCTS(object):
         self.v_s = {}
 
     def _c_puct(self, s):
-        return np.log((1 + self.n_s[s] + self.params.c_base) / self.params.c_base) + self.params.c_init
+        c = np.log((1 + self.n_s[s] + self.params.c_base) / self.params.c_base) + self.params.c_init
+        return c if c >= 4 else 4
 
     def _alpha(self, env):
         n = len(env.legal_moves)

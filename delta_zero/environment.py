@@ -100,9 +100,9 @@ class ChessEnvironment(object):
             np.ndarray: The board state from the POV of the current side to play.
         '''
         state = self.board_state
-        #if not self.white_to_move:
-        #    for i, plane in enumerate(state):
-        #        state[i] = np.rot90(plane, k=2)
+        if not self.white_to_move:
+            for i, plane in enumerate(state):
+                state[i] = np.rot90(plane, k=2)
         return state
 
     @property
@@ -181,7 +181,7 @@ class ChessEnvironment(object):
         logger.info('Adjudicating game...')
         current_os = platform.system()
         handler = uci.InfoHandler()
-        ep = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+        ep = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data',
                           f'stockfish-10-{"win" if current_os == "Windows" else "linux"}',
                           f'{current_os}',
                           f'stockfish_10_x64{".exe" if current_os == "Windows" else ""}')

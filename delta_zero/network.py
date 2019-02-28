@@ -15,10 +15,10 @@ def_hparams = dotdict(
     residual_kernel_size=3,
     stride=1,
     fc_size=256,
-    n_residual_layers=10,
+    n_residual_layers=19,
     learning_rate=0.001,
     batch_size=128,
-    epochs=10,
+    epochs=3,
     dropout=0.4,
     l2_reg=1e-4
 )
@@ -187,7 +187,6 @@ class ChessNetwork(NeuralNetwork):
                 X = Activation('relu', name='policy_relu')(X)
                 X = Flatten()(X)
                 X = Dense(2048, activation='relu', name='fcp')(X)
-                X = Dropout(self.hparams.dropout)(X)
                 X = Dense(len(labels), activation='softmax', name='policy_out')(X)
                 return X
 

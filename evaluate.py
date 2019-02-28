@@ -22,7 +22,7 @@ class Runner(object):
     def __init__(self, net_name, iteration, cur_white=True):
         self.net_name = net_name
         self.iteration = iteration
-        self.game_name = f'Game {self.iteration}'
+        self.game_name = f'Game {self.iteration + 1}'
         self.cur_white = cur_white
 
     def run_evaluation(self):
@@ -42,11 +42,13 @@ class Runner(object):
                         'play against blank slate version.')
 
         mcts_params = dotdict(
-            n_sims=100,
-            cpuct=4.0,
-            alpha=0.3,
-            eps=0.25,
+            n_sims=800,
+            c_base=4.0,
+            c_init=1.0,
+            eps=0.155,
             resign_threshold=-0.85,
+            temperature=0.90,
+            use_noise=False
         )
 
         c_mcts = MCTS(current_network, params=mcts_params)
@@ -56,7 +58,8 @@ class Runner(object):
 
         agent_params = dotdict(
             temp_threshold=0,
-            max_hmoves=100
+            max_hmoves=100,
+            n_book_moves=5
         )
 
         c_version = ChessAgent(c_mcts, env, params=agent_params)
@@ -66,21 +69,28 @@ class Runner(object):
 
     def play_game(self, c_version, ng_version, env):
 
+        step = 0
         while not env.is_game_over:
+            step += 1
+            use_book = step <= c_version.params.n_book_moves * 2
             if self.cur_white:
                 if env.white_to_move:
-                    c_version.move(self.game_name,
-                                   'current')
+                    c_version.move(step,
+                                   use_book=use_book)
                 else:
-                    ng_version.move(self.game_name,
-                                    'nextgen')
+                    ng_version.move(step,
+                                    use_book=use_book)
             else:
                 if env.white_to_move:
-                    ng_version.move(self.game_name,
-                                    'nextgen')
+                    ng_version.move(step,
+                                    use_book=use_book)
                 else:
-                    c_version.move(self.game_name,
-                                   'current')
+                    c_version.move(step,
+                                   use_book=use_book)
+            if step % 2 == 0:
+                logger.info(f'{step / 2} moves played in {self.game_name}')
+            if step >= c_version.params.max_hmoves:
+                env.adjudicate()
 
         winner = env.result_side()
         if self.cur_white and winner == 'White' or \
@@ -90,7 +100,7 @@ class Runner(object):
              (not self.cur_white and winner == 'White'):
             winner = 'Next-Gen'
 
-        ocolor = "White" if not self.cur_white else "Black"
+        ocolor = 1 if not self.cur_white else -1
         logger.info(f'{self.game_name} over. Result: {env.result_string()} ({winner})')
         env.to_pgn(f'{c_version.search_tree.network.name} - Eval', self.game_name,
                    self_play_game=False, opponent_color=ocolor, opponent='Nextgen')
@@ -100,7 +110,7 @@ class Runner(object):
 def main():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('net_name', type=str,
+    parser.add_argument('--netname', dest='net_name', type=str,
                         help='The name of the network to use. A "current" '
                              'version of the network must exist.')
     args = parser.parse_args()

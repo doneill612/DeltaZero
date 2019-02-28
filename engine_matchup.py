@@ -14,19 +14,19 @@ from delta_zero.utils import dotdict
 logger = Logger.get_logger('engine-matchup')
 
 mcts_params = dotdict(
-    n_sims=800,
+    n_sims=200,
     c_base=4.0,
     c_init=1.0,
     eps=0.155,
     resign_threshold=-0.85,
-    temperature=0.5,
+    temperature=0.85,
     use_noise=False
 )
 
 engine_params = dotdict(
     depth=2,
     time=0.01,
-    nodes=20
+    nodes=100
 )
 
 def matchup(net_name, play_black=False):
@@ -39,7 +39,7 @@ def matchup(net_name, play_black=False):
     agent = ChessAgent(mcts, env)
 
     current_os = platform.system()
-    ep = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'delta_zero',
+    ep = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'delta_zero', 'data',
                       f'stockfish-10-{"win" if current_os == "Windows" else "linux"}',
                       f'{current_os}',
                       f'stockfish_10_x64{".exe" if current_os == "Windows" else ""}')
@@ -58,6 +58,7 @@ def play_game(agent, engine, play_black):
         if (agent.env.white_to_move and not play_black) \
            or (not agent.env.white_to_move and play_black):
             agent.move(step, use_book=use_book)
+            print(f'{agent.env}\n')
         else:
             einfo = engine.play(agent.env.board,
                                 eng.Limit(time=engine_params.time,
@@ -68,10 +69,10 @@ def play_game(agent, engine, play_black):
         if step % 2 == 0:
             logger.info(f'{step / 2} moves played')
         step += 1
-        print(f'{agent.env}\n')
+        
 
     ocolor = 1 if play_black else -1
-    agent.env.to_pgn('dz0', 'dummy stockfish matchup', opponent='dummy stockfish',
+    agent.env.to_pgn(agent.search_tree.network.name, 'dummy stockfish matchup', opponent='dummy stockfish',
                      opponent_color=ocolor)
     engine.close()
     
