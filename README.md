@@ -93,7 +93,7 @@ For each game, a single training example is extracted in the following manner:
 - The game is loaded into a `ChessEnvironment` object.
 - At each move, the board state is encoded into a `(19, 8, 8)` matrix.
 - The policy for the move is created in the following manner:
-  - The ELO ratings of each player are recorded. The move that was actually played in the game is assigned a high probability, proportional to the ELO rating of the player that made the move. The probablity is calculated as $P = 1 - exp(\alpha\eps)$, where $\eps$ is the ELO rating and $\alpha = -0.00122$ (found by trial and error). The remainder probability ($1 - P$) is divided amongst the rest of the legal moves in the position. The illegal moves are masked with a probability of 0.
+  - The ELO ratings of each player are recorded. The move that was actually played in the game is assigned a high probability, proportional to the ELO rating of the player that made the move. The probablity is calculated as `P = 1 - exp(a*e)`, where `e` is the ELO rating and `a = -0.00122` (found by trial and error). The remainder probability (`1 - P`) is divided amongst the rest of the legal moves in the position. The illegal moves are masked with a probability of 0.
   - For example, a player with an ELO rating of 2000 (minumum ELO of any player in the training games) would have a probability of `0.913` assigned to the move he/she played in a game, while a player with an ELO rating of 2750 would have a probability of `0.965` assigned to a move.
 - The value is the result of the game - 1 for a white win, 0 for a draw, and -1 for a black win.
 
@@ -103,4 +103,4 @@ One training example per move is generated. DeltaZero trains with a batch size o
 
 The `mcts` module contains a class definition `MCTS` which is an implementation of the Monte Carlo Tree Search algorithm, slightly modified to use the predictions of the current iteration of the neural network to generate move probabilities. The MCTS hyperparameters are almost identical to those specified in the AlphaZero paper.
 
-When playing a game of chess, the `ChessAgent` in order to make a move will run $N$ simulations of MCTS in order to maximize the estimated value output of the game. Higher $N$ values can be equated to deeper thinking. During evaluation games, $N=800$ is chosen. Different values of $N$ are used to generate more varied games, and to gauge the prediction strength of the current network.
+When playing a game of chess, the `ChessAgent` in order to make a move will run $N$ simulations of MCTS in order to maximize the estimated value output of the game. Higher `N` values can be equated to deeper thinking. During evaluation games, `N = 800` is chosen. Different values of $N$ are used to generate more varied games, and to gauge the prediction strength of the current network.
