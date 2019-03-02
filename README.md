@@ -95,9 +95,9 @@ For each game, a single training example is extracted in the following manner:
 - The policy for the move is created in the following manner:
   - The ELO ratings of each player are recorded. The move that was actually played in the game is assigned a high probability, proportional to the ELO rating of the player that made the move. The probablity is calculated as `P = 1 - exp(a*e)`, where `e` is the ELO rating and `a = -0.00122` (found by trial and error). The remainder probability (`1 - P`) is divided amongst the rest of the legal moves in the position. The illegal moves are masked with a probability of 0.
   - For example, a player with an ELO rating of 2000 (minumum ELO of any player in the training games) would have a probability of `0.913` assigned to the move he/she played in a game, while a player with an ELO rating of 2750 would have a probability of `0.965` assigned to a move.
-- The value is the result of the game - 1 for a white win, 0 for a draw, and -1 for a black win.
+- The value is the result of the game: 1 for a white win, 0 for a draw, and -1 for a black win.
 
-One training example per move is generated. DeltaZero trains with a batch size of 256, and uses `Adam` as an optimizer, with an initial learning rate of 0.001.
+One training example per move is generated. DeltaZero trains with a batch size of 64, and uses `SGD` with LR decay (`1e-6`) and Nesterov Momentum as an optimizer, with an initial learning rate of 0.001.
 
 ### mcts.py
 
