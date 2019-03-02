@@ -10,7 +10,7 @@ from delta_zero.environment import ChessEnvironment
 from delta_zero.agent import ChessAgent
 from delta_zero.mcts import MCTS
 from delta_zero.logging import Logger
-from delta_zero.utils import dotdict
+from delta_zero.dzutils import dotdict
 
 logger = Logger.get_logger('evaluation')
 

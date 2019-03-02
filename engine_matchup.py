@@ -8,28 +8,29 @@ from delta_zero.agent import ChessAgent
 from delta_zero.environment import ChessEnvironment
 from delta_zero.mcts import MCTS
 from delta_zero.network import ChessNetwork
-from delta_zero.logging import Logger
+from delta_zero.dzlogging import Logger
 from delta_zero.utils import dotdict
 
 logger = Logger.get_logger('engine-matchup')
 
 mcts_params = dotdict(
-    n_sims=200,
+    n_sims=1000,
     c_base=4.0,
     c_init=1.0,
     eps=0.155,
     resign_threshold=-0.85,
-    temperature=0.85,
+    temperature=1.,
     use_noise=False
 )
 
 engine_params = dotdict(
     depth=2,
     time=0.01,
-    nodes=100
+    nodes=5
 )
 
 def matchup(net_name, play_black=False):
+
     env = ChessEnvironment()
     
     network = ChessNetwork(name=net_name)
@@ -57,8 +58,7 @@ def play_game(agent, engine, play_black):
         use_book = step <= agent.params.n_book_moves * 2
         if (agent.env.white_to_move and not play_black) \
            or (not agent.env.white_to_move and play_black):
-            agent.move(step, use_book=use_book)
-            print(f'{agent.env}\n')
+            agent.move(step, use_book=use_book)        
         else:
             einfo = engine.play(agent.env.board,
                                 eng.Limit(time=engine_params.time,
@@ -66,8 +66,11 @@ def play_game(agent, engine, play_black):
                                           nodes=engine_params.nodes))
             emove = einfo.move.uci()
             agent.env.push_action(emove)
+
         if step % 2 == 0:
             logger.info(f'{step / 2} moves played')
+            print(f'{agent.env}\n')
+
         step += 1
         
 

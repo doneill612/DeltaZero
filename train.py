@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 from delta_zero.network import ChessNetwork
-from delta_zero.logging import Logger
+from delta_zero.dzlogging import Logger
 
 logger = Logger.get_logger('training')
 

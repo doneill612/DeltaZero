@@ -3,7 +3,7 @@ import numpy as np
 from tqdm import tqdm
 
 from .utils import dotdict, labels
-from .logging import Logger
+from .dzlogging import Logger
 
 EPS = 1e-8
 
@@ -24,7 +24,6 @@ class MCTS(object):
 
     '''
     def __init__(self, network, params=def_params):
-        self.ofcount = 0
         self.network = network
         self.params = params
         self.q_sa = {}
@@ -35,9 +34,7 @@ class MCTS(object):
         self.v_s = {}        
 
     def pi(self, env, temp, sims=None):
-
-        self._alpha(env)
-
+        
         if sims is None:
             sims = self.params.n_sims
         sim_vs = np.zeros(shape=(sims))
@@ -65,14 +62,7 @@ class MCTS(object):
             return res
         else:
             counts = [c**(1. / self.params.temperature) for c in counts]
-            if sum(counts) > 0:
-                p = [c / float(sum(counts)) for c in counts]
-            else:
-                logger.info('0 counts')
-                legal = env.legal_moves
-                n_legal = len(legal)
-                p = np.isin(labels, legal, assume_unique=True) * labels
-                p = p / n_legal
+            p = [c / float(sum(counts)) for c in counts]
             if (self.params.resign_threshold and v > self.params.resign_threshold) \
                or not self.params.resign_threshold:
                 res['a'] = np.random.choice(labels, p=p)
@@ -80,7 +70,6 @@ class MCTS(object):
             return res
 
     def reset(self):
-        self.ofcount = 0
         self.q_sa = {}
         self.n_sa = {}
         self.n_s = {}
@@ -90,7 +79,7 @@ class MCTS(object):
 
     def _c_puct(self, s):
         c = np.log((1 + self.n_s[s] + self.params.c_base) / self.params.c_base) + self.params.c_init
-        return c if c >= 4 else 4
+        return c
 
     def _alpha(self, env):
         n = len(env.legal_moves)
@@ -113,15 +102,13 @@ class MCTS(object):
 
         if s not in self.p_s:
             self.p_s[s], v = self.network.predict(c_state)
+            print(self.p_s[s])
             legal = np.asarray(env.legal_moves)
             legal_mask = np.isin(labels, legal, assume_unique=True)
             self.p_s[s] = self.p_s[s] * legal_mask
             
             sum_p_s_s = np.sum(self.p_s[s])
-            if sum_p_s_s < 0.001:
-                self.ofcount += 1
-                logger.verbose(f'Possible overfit... count: {self.ofcount}')
-                
+          
             if sum_p_s_s > 0:
                 self.p_s[s] /= sum_p_s_s
             else:                
@@ -147,12 +134,15 @@ class MCTS(object):
                     u = self.q_sa[(s, a_idx)] + c * \
                         p_  * np.sqrt(self.n_s[s]) / \
                         (1 + self.n_sa[(s, a_idx)])
+                    print(u, cur_best)
                 else:
                     u = c *  p_ * np.sqrt(self.n_s[s] + EPS)
+                    print(u, cur_best)
                 if u > cur_best:
+                    print('should have found a best')
                     cur_best = u
                     best_action_idx = a_idx
-                    
+
         best_action = labels[best_action_idx]
 
         env.push_action(best_action)

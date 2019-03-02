@@ -10,7 +10,7 @@ import numpy as np
 
 import chess.uci as uci
 
-from .logging import Logger
+from .dzlogging import Logger
 
 PIECES = [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING] = range(1, 7)
 COLORS = [WHITE, BLACK] = [True, False]
@@ -41,12 +41,8 @@ class ChessEnvironment(object):
     numpy arrays.
 
     The state of a chess board in the context of a reinforcement learning application
-    is represented as a (18, 8, 8) tensor - qualitatively, 18 'planes' of 8x8 boards, the
+    is represented as a (19, 8, 8) tensor - qualitatively, 19 'planes' of 8x8 boards, the
     values of each plane representing information about the game in progress.
-
-        - planes 1-6 => white piece positions
-        - planes 7-12 => black piece positions
-        - planes 13-18 => castling rights, fifty-move rule, en-passant square
 
     Actions (chess moves) are represented in UCI notation, and are pushed to the board's
     move stack.
@@ -66,7 +62,8 @@ class ChessEnvironment(object):
     @property
     def legal_moves(self):
         '''
-        Returns a list of the current legal moves in the position.
+        Returns a list of the curre
+nt legal moves in the position.
         The moves are represented in UCI notation.
 
         Returns
@@ -108,10 +105,10 @@ class ChessEnvironment(object):
     @property
     def board_state(self):
         '''
-        Stacks the piece planes and auxiliary planes into a single
-        (19, 8, 8) array. 
+        Stacks the piece planes, history planes and auxiliary planes into a single
+        (55, 8, 8) array. 
 
-        This (19, 8, 8) array represents the chess board state from white's POV.
+        This (55, 8, 8) array represents the chess board state from white's POV.
 
         Returns
         -------
@@ -119,7 +116,9 @@ class ChessEnvironment(object):
         '''
         piece = self.build_piece_planes()
         auxiliary = self.build_auxiliary_planes()
-        return np.vstack([piece, auxiliary])
+
+        state = np.vstack([piece, auxiliary])
+        return state
     
     @property
     def is_game_over(self):
@@ -217,7 +216,7 @@ class ChessEnvironment(object):
         '''
         if action_uci is not None:
             self.board.push_uci(action_uci)
-            
+           
         else:
             logger.verbose(f'{"White" if self.white_to_move else "Black"} resigns.')
             self._send_resignation()
@@ -237,6 +236,7 @@ class ChessEnvironment(object):
         '''
         self.winner = None
         self.board = chess.Board()
+        
 
     def copy(self):
         '''
@@ -282,7 +282,8 @@ class ChessEnvironment(object):
     def result_value(self):
         if self.winner:
             return self.winner['key']
-
+            
+        
     def build_piece_planes(self):
         '''
         Builds a (12, 8, 8) bit-array representing the positions
@@ -293,7 +294,7 @@ class ChessEnvironment(object):
             np.ndarray: A group of planes representing the positions of every piece
                         on the board
         '''
-        p_planes = np.zeros(shape=(12, 8, 8), dtype=np.int32)
+        p_planes = np.zeros(shape=(12, 8, 8), dtype=np.int64)
         pidx = 0
         for color in COLORS:
             for piece in PIECES:
@@ -314,7 +315,7 @@ class ChessEnvironment(object):
         '''
         [KSC_WHITE, QSC_WHITE, KSC_BLACK, QSC_BLACK, FIFTY_MOVE, EPS, SIDE] = range(7)
         
-        auxiliary_planes = np.zeros(shape=(7, 8, 8), dtype=np.int32)
+        auxiliary_planes = np.zeros(shape=(7, 8, 8), dtype=np.int64)
         fen = self.board.fen()
         splits = fen.split(' ')
 

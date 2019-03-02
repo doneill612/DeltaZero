@@ -11,7 +11,7 @@ from delta_zero.network import ChessNetwork
 from delta_zero.environment import ChessEnvironment
 from delta_zero.agent import ChessAgent
 from delta_zero.mcts import MCTS
-from delta_zero.logging import Logger
+from delta_zero.dzlogging import Logger
 
 logger = Logger.get_logger('selfplay')
 

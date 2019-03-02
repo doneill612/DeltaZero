@@ -7,12 +7,12 @@ import numpy as np
 import chess.polyglot as book
 
 from .utils import dotdict, labels
-from .logging import Logger
+from .dzlogging import Logger
 
 def_params = dotdict(
     temp_threshold=10,
     max_hmoves=500,
-    n_book_moves=5,
+    n_book_moves=10,
 )
 
 logger = Logger.get_logger('ChessAgent')

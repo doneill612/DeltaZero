@@ -9,13 +9,14 @@ from keras.callbacks import EarlyStopping
 from keras.losses import categorical_crossentropy, mean_squared_error
 import keras.backend as K
 
-
 from delta_zero.environment import ChessEnvironment
 from delta_zero.network import ChessNetwork
 from delta_zero.utils import labels
-from delta_zero.logging import Logger
+from delta_zero.dzlogging import Logger
 
 logger = Logger.get_logger('supervised-learning')
+
+EPS = 1e-6
 
 def train(net_name):
     net = ChessNetwork(net_name)
@@ -23,32 +24,22 @@ def train(net_name):
         net.load(version='current')
     except:
         pass
-    gen = kingbase_generator(net.hparams.batch_size)
-    with net.graph.as_default():
-        with net.session.as_default():
-            for e in range(net.hparams.epochs):
-                logger.info(f'Epoch {e + 1}/{net.hparams.epochs}')
-                for i, (X, y) in enumerate(gen):
-                    # 20% validation split
-                    if (i+1) % 5 == 0:
-                        loss = net.model.test_on_batch(X, y)
-                        if (i+1) % 30 == 0:
-                            logger.info(f'val_loss: {loss[0]:.3f}, '
-                                        f'val_pi_loss: {loss[1]:.3f}, '
-                                        f'val_v_loss: {loss[2]:.3f}')
-                    else:
-                        loss = net.model.train_on_batch(X, y)
-                        logger.info(f'loss: {loss[0]:.3f}, '
-                                    f'pi_loss: {loss[1]:.3f}, '
-                                    f'v_loss: {loss[2]:.3f}')
-                    if (i+1) % 1000 == 0:
-                        # save the model every 1000 steps (1 step = batch_size examples)
-                        net.save(version='current')
-                # save the model every epoch
+    for e in range(net.hparams.epochs):
+        gen = kingbase_generator(net.hparams.batch_size)
+        logger.info(f'Epoch {e + 1}/{net.hparams.epochs}')
+        for i, (X, y) in enumerate(gen):
+            loss = net.train_on_batch(X, y)
+            logger.info(f'loss: {loss[0]:.3f}, '
+                        f'pi_loss: {loss[1]:.3f}, '
+                        f'v_loss: {loss[2]:.3f}')
+            if (i+1) % 1000 == 0:
+                # save the model every 1000 steps (1 step = batch_size examples)
                 net.save(version='current')
+        # save the model every epoch
+        net.save(version='current')
                     
 def clip(elo):
-    y = (1. - np.exp(-.00122 * elo))
+    y = (1. - np.exp(-.000522 * elo))
     return y
 
 def kingbase_generator(batch_size):
@@ -58,7 +49,7 @@ def kingbase_generator(batch_size):
                              'supervised_learning', 'kingbase')
     env = ChessEnvironment()
 
-    fn = os.path.join(directory, 'KingBaseLite2019-B00-B19.pgn')
+    fn = os.path.join(directory, 'KingBaseLite2019-C60-C99.pgn')
     with open(fn, 'r', encoding="ISO-8859-1") as pgn_file:
         data = pgn_file.read()
         splits = iter(data.split('\n\n'))
@@ -66,6 +57,7 @@ def kingbase_generator(batch_size):
         p_batch = np.empty(shape=(batch_size, 1968,))
         v_batch = np.empty(shape=(batch_size, 1))
         batch_idx = 0
+        games = 0
         batches = 0
         for header, game in zip(splits, splits):
             sio = io.StringIO(f'{header}\n\n{game}')
@@ -92,12 +84,19 @@ def kingbase_generator(batch_size):
                     nonplayed = [x for x in env.legal_moves if x != m]
                     played_idx = np.where(labels==m)
                     nonplayed_idx = list(np.where(labels==n) for n in nonplayed)
-                    clipped_p = clip(elo1 if (i % 2 == 0) else elo2)
-                    try:
-                        rem = (1. - clipped_p) / float(len(nonplayed))
-                    except RuntimeWarning:
-                        logger.warning('Divide by zero encountered, setting prior probs to 0.')
-                        rem = 0
+                    clipped_p = 0
+                    if env.white_to_move:
+                        clipped_p = clip(elo1)
+                    else:
+                        clipped_p = clip(elo2)
+
+                    n_nonplayed = len(nonplayed)
+                    if n_nonplayed > 0:
+                        rem = (1. - clipped_p) / float(n_nonplayed)
+                    else:
+                        clipped_p = 1. - EPS
+                        rem = EPS
+
                     policy[played_idx] = clipped_p
                     np.put(policy, nonplayed_idx, rem)
                     p_batch[batch_idx] = policy
@@ -116,6 +115,8 @@ def kingbase_generator(batch_size):
                         p_batch = np.empty(shape=(batch_size, 1968,))
                         v_batch = np.empty(shape=(batch_size, 1,))
             env.reset()
+            games += 1
+            logger.info(f'Processed {games} games, {batches} steps ({batches * batch_size})') 
         # no more games, yield no matter what
         yield s_batch, [p_batch, v_batch]
     
