@@ -14,7 +14,7 @@ def_params = dotdict(
     c_init=1.0,
     eps=0.15,
     resign_threshold=None,
-    temperature=0.05,
+    temperature=1.,
     use_noise=True
 )
 

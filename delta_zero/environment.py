@@ -70,7 +70,7 @@ nt legal moves in the position.
         -------
             list: a list of legal moves in uci notation
         '''
-        return list(m.uci() for m in self.board.legal_moves)
+        return np.asarray(list(m.uci() for m in self.board.legal_moves))
 
     @property
     def white_to_move(self):
