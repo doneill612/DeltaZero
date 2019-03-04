@@ -63,10 +63,11 @@ def main(net_name, n_sessions, gps, ckpt=None):
     '''
     for j in range(n_sessions):
         exs = []
-        runners = [Runner.remote(net_name=net_name, iteration=i) for i in range(2)]
+        runners = [Runner.remote(net_name=net_name, iteration=i) for i in range(gps)]
         exs.extend(ray.get([r.run_selfplay.remote() for r in runners]))
         exs = np.squeeze(np.asarray(exs))
-        exs = exs.reshape((exs.shape[0] * exs.shape[1], exs.shape[2]))
+        if len(exs.shape) > 2:
+            exs = exs.reshape((exs.shape[0] * exs.shape[1], exs.shape[2]))
         logger.info(f'Session examples extracted: {exs.shape[0]}')
         network = ChessNetwork(net_name)
         try:
