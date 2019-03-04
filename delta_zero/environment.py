@@ -170,8 +170,14 @@ nt legal moves in the position.
             game.headers['Result'] == self.result_string()
         exporter = pgn.FileExporter(open(os.path.join(pgn_path, file_name), 'w', encoding='utf-8'))
         game.accept(exporter)
-        logger.info(f'Game saved to data/{folder_name}/{file_name}')
+        logger.info(f'Game saved to data/{folder_name}/pgns/{file_name}')
 
+    def draw(self):
+        '''
+        Adjudicates the game in progress by calling a draw.
+        '''
+        self._end_game(0)
+        
     def adjudicate(self):
         '''
         Adjudicates the game in progress by performing a centipawn evaluation

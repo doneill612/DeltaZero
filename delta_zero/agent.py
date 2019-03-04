@@ -10,9 +10,9 @@ from .utils import dotdict, labels
 from .dzlogging import Logger
 
 def_params = dotdict(
-    temp_threshold=10,
-    max_hmoves=500,
-    n_book_moves=10,
+    temp_threshold=30,
+    max_hmoves=200,
+    n_book_moves=1,
 )
 
 logger = Logger.get_logger('ChessAgent')
@@ -44,7 +44,7 @@ class ChessAgent(object):
         self.search_tree = search_tree
         self.params = params
 
-    def play(self, game_name):
+    def play(self, game_name, save=True):
         '''
         Makes the agent play itself in a game of chess.
         '''
@@ -56,7 +56,7 @@ class ChessAgent(object):
             step += 1
 
             if step > self.params.max_hmoves:
-                self.env.adjudicate()
+                self.env.draw()
                 continue
 
             if step % 50 == 0:
@@ -71,30 +71,31 @@ class ChessAgent(object):
                 action = self._get_book_move(step)
                 pr = np.ones(shape=len(labels)) * np.isin(labels, action, assume_unique=True).astype(np.int32)
                 if action is not None:
-                    examples.append([c_state, turn, pr])
+                    examples.append([c_state, pr, 0.])
             else:
                 pi = self.search_tree.pi(self.env, temp=temperature)
                 action = pi['a']
-                examples.append([c_state, turn, pi['pr']])
-            if action is None:
+                examples.append([c_state, pi['pr'], pi['q']])
+            if action is None and use_book:
                 pi = self.search_tree.pi(self.env, temp=temperature)
                 action = pi['a']
-                examples.append([c_state, turn, pi['pr']])
+                
+                examples.append([c_state, pi['pr'], pi['q']])
             
             self.env.push_action(action)
             
             turn *= -1
 
-
         res_val = self.env.result_value()
-        self.env.to_pgn(self.search_tree.network.name, game_name)
+        if save:
+            self.env.to_pgn(self.search_tree.network.name, game_name)
         logger.info(f'Game over - result: {self.env.result_string()}')
         self.reset()
-        examples = [[ex[0], ex[2], res_val * ((-1)**(ex[1] != turn))] for ex in examples]
-        
-        return examples
 
-    def move(self, step, use_book=False, temp=True):
+        return examples
+        
+    def move(self, step, use_book=False):
+        temp = step > self.params.temp_threshold
         if use_book:
             action = self._get_book_move(step)
         else:

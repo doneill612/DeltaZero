@@ -8,21 +8,20 @@ from .dzlogging import Logger
 EPS = 1e-8
 
 def_params = dotdict(
-    n_sims=800,
+    n_sims=25,
+    c_puct=4.,
     c_base=4.0,
     c_init=1.0,
-    eps=0.10,
-    resign_threshold=-0.85,
-    temperature=0.175,
+    eps=0.15,
+    resign_threshold=None,
+    temperature=0.05,
     use_noise=True
 )
 
 logger = Logger.get_logger('MCTS')
 
 class MCTS(object):
-    '''
 
-    '''
     def __init__(self, network, params=def_params):
         self.network = network
         self.params = params
@@ -39,18 +38,17 @@ class MCTS(object):
             sims = self.params.n_sims
         sim_vs = np.zeros(shape=(sims))
 
-        logger.info(f'Running {sims} simulations...')
         for i in range(sims):
             sim_vs[i] = self._search(env.copy())
 
         v = np.max(sim_vs)
 
-        res = {'a': None, 'pr': None, 'v': None}
+        res = {'a': None, 'pr': None, 'q': None}
         s = env.to_string()
         counts = [self.n_sa[(s, a_idx)] if (s, a_idx) in self.n_sa else 0
                   for a_idx in range(len(labels))]
 
-        res['v'] = v
+        res['q'] = v
         
         if not temp:
             best_action_idx = np.argmax(counts)
@@ -79,7 +77,7 @@ class MCTS(object):
 
     def _c_puct(self, s):
         c = np.log((1 + self.n_s[s] + self.params.c_base) / self.params.c_base) + self.params.c_init
-        return c
+        return c if c >= 4. else 4.
 
     def _alpha(self, env):
         n = len(env.legal_moves)
@@ -102,7 +100,6 @@ class MCTS(object):
 
         if s not in self.p_s:
             self.p_s[s], v = self.network.predict(c_state)
-            print(self.p_s[s])
             legal = np.asarray(env.legal_moves)
             legal_mask = np.isin(labels, legal, assume_unique=True)
             self.p_s[s] = self.p_s[s] * legal_mask
@@ -134,12 +131,9 @@ class MCTS(object):
                     u = self.q_sa[(s, a_idx)] + c * \
                         p_  * np.sqrt(self.n_s[s]) / \
                         (1 + self.n_sa[(s, a_idx)])
-                    print(u, cur_best)
                 else:
                     u = c *  p_ * np.sqrt(self.n_s[s] + EPS)
-                    print(u, cur_best)
                 if u > cur_best:
-                    print('should have found a best')
                     cur_best = u
                     best_action_idx = a_idx
 

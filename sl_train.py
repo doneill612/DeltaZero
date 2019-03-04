@@ -1,13 +1,10 @@
 import argparse
 import os
 import io
+import time
 
 import numpy as np
 import chess.pgn as pgn
-
-from keras.callbacks import EarlyStopping
-from keras.losses import categorical_crossentropy, mean_squared_error
-import keras.backend as K
 
 from delta_zero.environment import ChessEnvironment
 from delta_zero.network import ChessNetwork
@@ -18,28 +15,45 @@ logger = Logger.get_logger('supervised-learning')
 
 EPS = 1e-6
 
-def train(net_name):
+def train(net_name, version='current', ckpt=None):
     net = ChessNetwork(net_name)
+
+    if version not in ('current', 'nextgen'):
+        logger.fatal(f'Invalid version type: {version}. '
+                     'Must be "nextgen" or "current"')
+        raise ValueError('Invalid version type')
+
     try:
-        net.load(version='current')
+        net.load(version=version, ckpt=ckpt)
     except:
         pass
+
+
+    start = time.time()
     for e in range(net.hparams.epochs):
         gen = kingbase_generator(net.hparams.batch_size)
         logger.info(f'Epoch {e + 1}/{net.hparams.epochs}')
         for i, (X, y) in enumerate(gen):
-            loss = net.train_on_batch(X, y)
-            logger.info(f'loss: {loss[0]:.3f}, '
+            loss = net.batch_train(X=X, y=y)
+            
+            if (i+1) % 10 == 0:
+                logger.info(f'loss: {loss[0]:.3f}, '
                         f'pi_loss: {loss[1]:.3f}, '
                         f'v_loss: {loss[2]:.3f}')
-            if (i+1) % 1000 == 0:
+                elapsed = time.time() - start
+                elapsed_str = f'{elapsed:.3f}'
+                mins = elapsed // 60
+                if mins >= 1:
+                    elapsed_str = f'{int(mins)} min. {elapsed - 60 * mins:.3f} sec.'
+                logger.info(f'Elapsed: {elapsed_str} sec.')
+            if (i+1) % 10000 == 0:
                 # save the model every 1000 steps (1 step = batch_size examples)
-                net.save(version='current')
+                net.save(version=version, ckpt=(i+1))
         # save the model every epoch
-        net.save(version='current')
+        net.save(version=version)
                     
 def clip(elo):
-    y = (1. - np.exp(-.000522 * elo))
+    y = (1. - np.exp(-.000622 * elo))
     return y
 
 def kingbase_generator(batch_size):
@@ -70,7 +84,7 @@ def kingbase_generator(batch_size):
             elif result == '1':
                 result = 1
             else:
-                result = 0
+                result = -1
             moves = [m.uci() for m in list(g.mainline_moves())]
             n_moves = len(moves)
             for i in range(0, n_moves, batch_size):
@@ -96,7 +110,6 @@ def kingbase_generator(batch_size):
                     else:
                         clipped_p = 1. - EPS
                         rem = EPS
-
                     policy[played_idx] = clipped_p
                     np.put(policy, nonplayed_idx, rem)
                     p_batch[batch_idx] = policy
@@ -116,17 +129,24 @@ def kingbase_generator(batch_size):
                         v_batch = np.empty(shape=(batch_size, 1,))
             env.reset()
             games += 1
-            logger.info(f'Processed {games} games, {batches} steps ({batches * batch_size})') 
+            if games % 10 == 0:
+                logger.info(f'Processed {games} games, {batches} steps ({batches * batch_size} positions)') 
         # no more games, yield no matter what
         yield s_batch, [p_batch, v_batch]
+        env.reset()
     
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--netname', dest='net_name', type=str)
+    parser.add_argument('--checkpoint', nargs='?', default=None, dest='ckpt', type=int)
+    parser.add_argument('--version', nargs='?', default='current', dest='version', type=str)
+
 
     args = parser.parse_args()
     net_name = args.net_name
+    version = args.version
+    ckpt = args.ckpt
     
-    train(net_name)
+    train(net_name, version=version, ckpt=ckpt)

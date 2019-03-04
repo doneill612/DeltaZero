@@ -22,13 +22,13 @@ class Runner(object):
     '''
     A `ray` actor responsible for executing a single session of self-play.
     '''
-    def __init__(self, net_name, iteration, version='nextgen'):
+    def __init__(self, net_name, iteration, version='current'):
         '''
         Params
         ------
             net_name (str): the name of the network to use
             iteration (int): the game number in this self-play session
-            warm_start (int): a warm-start version number to load the network from
+            
         '''
         self.net_name = net_name
         self.version = version
@@ -49,58 +49,53 @@ class Runner(object):
         except ValueError:
             pass
             
-
         env = ChessEnvironment()
 
         search_tree = MCTS(network)
         agent = ChessAgent(search_tree, env)
-
-        train_examples = agent.play(game_name=f'{self.net_name}_game{self.iteration+1}')
-        logger.info(f'Game complete, generated {len(train_examples)} examples.')
-        return train_examples
+        exs = agent.play(game_name=f'{self.net_name}_game{self.iteration+1}', save=False)
+        
+        return exs
     
-
-def main():
+def main(net_name, n_sessions, gps, ckpt=None):
     '''
     Utilizes all CPU cores to run self-play tasks.
-    The results of all the games are aggregated and saved to a training set .npy file.
     '''
-    Logger.set_log_level('info')
+    for j in range(n_sessions):
+        exs = []
+        runners = [Runner.remote(net_name=net_name, iteration=i) for i in range(2)]
+        exs.extend(ray.get([r.run_selfplay.remote() for r in runners]))
+        exs = np.squeeze(np.asarray(exs))
+        exs = exs.reshape((exs.shape[0] * exs.shape[1], exs.shape[2]))
+        logger.info(f'Session examples extracted: {exs.shape[0]}')
+        network = ChessNetwork(net_name)
+        try:
+            network.load(version='current')
+        except:
+            logger.warn('No current version found, starting fresh.')
+        network.batch_train(examples=exs)
+        network.save(version='current', ckpt=exs.shape[0])
     
+  
+        
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('net_name', type=str,
+    parser.add_argument('--netname', dest='net_name', type=str,
                         help='The name of the network to use. If a saved network '
                              'with this name exists, it is loaded before executing '
                              'self-play.')
-    parser.add_argument('version', nargs='?', type=str, help='Network version to load - "current" or "nextgen"')
-    
+    parser.add_argument('--sessions', dest='nsessions', default=1, nargs='?', type=int,
+                        help='The number of self-play sessions to execute.')
+    parser.add_argument('--gps', dest='gps', default=1, nargs='?', type=int,
+                        help='The number of games per session of self-play to execute.')
+    parser.add_argument('--checkpoint', dest='ckpt', default=None, nargs='?', type=int,
+                        help='A checkpoint integer indicating which specific iteration of '
+                             'the network to load.')
     args = parser.parse_args()
-
-    n_games = 1
-    
     net_name = args.net_name
-    version = args.version
-
-    runners = [Runner.remote(net_name=net_name, iteration=i, version=version) for i in range(n_games)]
-    all_examples = []
-    train_examples = ray.get([r.run_selfplay.remote() for r in runners])
-    for ex in train_examples:
-        all_examples.extend(ex)
-
-    all_examples = np.asarray(all_examples)
-
-    train_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                             'delta_zero',
-                             'data',
-                             net_name,
-                             'train')
-    if not os.path.exists(train_dir):
-        os.makedirs(train_dir)
-        logger.info('Train directory created.')
-    fn = os.path.join(train_dir, 'train_set.npy')
-    np.save(fn, train_examples)
-    logger.info(f'Games finished - {len(all_examples)} training examples saved.')
-        
-if __name__ == '__main__':
-    main()
+    ckpt = args.ckpt
+    nsessions = args.nsessions
+    gps = args.gps
+    
+    main(net_name, nsessions, gps, ckpt=ckpt)
     

@@ -9,8 +9,8 @@ from delta_zero.network import ChessNetwork
 from delta_zero.environment import ChessEnvironment
 from delta_zero.agent import ChessAgent
 from delta_zero.mcts import MCTS
-from delta_zero.logging import Logger
-from delta_zero.dzutils import dotdict
+from delta_zero.dzlogging import Logger
+from delta_zero.utils import dotdict
 
 logger = Logger.get_logger('evaluation')
 
@@ -19,9 +19,10 @@ ray.init()
 @ray.remote
 class Runner(object):
 
-    def __init__(self, net_name, iteration, cur_white=True):
+    def __init__(self, net_name, iteration, ckpt=None, cur_white=True):
         self.net_name = net_name
         self.iteration = iteration
+        self.ckpt=ckpt
         self.game_name = f'Game {self.iteration + 1}'
         self.cur_white = cur_white
 
@@ -36,19 +37,19 @@ class Runner(object):
 
         nextgen_network = ChessNetwork(self.net_name)
         try:
-            nextgen_network.load(version='nextgen')
+            nextgen_network.load(version='nextgen', ckpt=self.ckpt)
         except ValueError:
             logger.warn('No nextgen version of this model - testing '
                         'play against blank slate version.')
 
         mcts_params = dotdict(
-            n_sims=800,
+            n_sims=100,
             c_base=4.0,
             c_init=1.0,
             eps=0.155,
             resign_threshold=-0.85,
-            temperature=0.90,
-            use_noise=False
+            temperature=1,
+            use_noise=True
         )
 
         c_mcts = MCTS(current_network, params=mcts_params)
@@ -58,7 +59,7 @@ class Runner(object):
 
         agent_params = dotdict(
             temp_threshold=0,
-            max_hmoves=100,
+            max_hmoves=50,
             n_book_moves=5
         )
 
@@ -113,15 +114,19 @@ def main():
     parser.add_argument('--netname', dest='net_name', type=str,
                         help='The name of the network to use. A "current" '
                              'version of the network must exist.')
+    parser.add_argument('--checkpoint', dest='ckpt', default=None, nargs='?', type=int)
+    parser.add_argument('--ngames', dest='n_games', default=mp.cpu_count(), nargs='?', type=int)
     args = parser.parse_args()
     net_name = args.net_name
-    match_length = mp.cpu_count()
-
+    
+    match_length = args.n_games
+    ckpt = args.ckpt
+    
     color = False
     runners = []
     for i in range(match_length):
         color = not color
-        runners.append(Runner.remote(net_name=net_name, iteration=i, cur_white=color))
+        runners.append(Runner.remote(net_name=net_name, ckpt=ckpt, iteration=i, cur_white=color))
 
     ray.get([r.run_evaluation.remote() for r in runners])
 

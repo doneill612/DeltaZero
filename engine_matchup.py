@@ -14,12 +14,12 @@ from delta_zero.utils import dotdict
 logger = Logger.get_logger('engine-matchup')
 
 mcts_params = dotdict(
-    n_sims=1000,
-    c_base=4.0,
+    n_sims=800,
+    c_base=10.0,
     c_init=1.0,
-    eps=0.155,
+    eps=0.3,
     resign_threshold=-0.85,
-    temperature=1.,
+    temperature=1.2,
     use_noise=False
 )
 
