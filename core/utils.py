@@ -3,6 +3,19 @@ import numpy as np
 class dotdict(dict):
     def __getattr__(self, name):
         return self[name]
+
+def tfsession(func):
+    def wrapper(*args):
+        _self = args[0]
+        graph = _self.graph
+        session = _self.session
+        with graph.as_default():
+            with session.as_default():
+                if len(args) > 1:
+                    return func(args[0], *args[1:])
+                else:
+                    return func(args[0])
+    return wrapper
     
 def _build_labels():
     labels_array = []

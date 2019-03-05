@@ -121,8 +121,6 @@ class Node(object):
             self.u = c_puct * self.p * \
                      np.sqrt(self.parent.n) / (1 + self.n)
 
-    
-
 class MCTS(object):
     '''
     The neural network-driven Monte Carlo Search Tree.
@@ -140,7 +138,6 @@ class MCTS(object):
     network is used to estimate a policy for tree node exploration and a value for tree node q-value updating.
     '''
     def __init__(self, network, c_puct=4., playout_depth=25, simulations=25):
-
         '''Constructs a Monte Carlo Search Tree.
         
         Params
@@ -238,12 +235,14 @@ class MCTS(object):
         res['a'] = most_visited[0]
         res['pr'] = most_visited[1].p
         res['q'] = most_visited[1].q
+        
         return res
 
     def _mask_illegal(self, action_p, env):
         '''Masks illegal moves with 0 probability in the given state.'''
         legal = env.legal_moves
         mask = np.isin(labels, legal, assume_unique=True).astype(np.int32)
+
         # mask illegal moves with 0 probability
         masked_action_p = action_p * mask
         # renormalize probability distribution
@@ -253,4 +252,5 @@ class MCTS(object):
         else:
             masked_action_p = masked_action_p + mask
             masked_action_p /= np.sum(masked_action_p)
+            
         return masked_action_p

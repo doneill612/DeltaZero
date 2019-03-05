@@ -2,7 +2,7 @@ import sys
 import os
 
 sys.path.append(os.path.join(os.path.pardir, os.path.dirname(__file__)))
-from core.clean_mcts import MCTS
+from core.oomcts import MCTS
 from core.network import ChessNetwork
 from core.environment import ChessEnvironment
 from core.dzlogging import Logger

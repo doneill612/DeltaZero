@@ -5,7 +5,7 @@ import os
 
 import numpy as np
 
-from .utils import labels, dotdict
+from .utils import labels, dotdict, tfsession
 from .dzlogging import Logger
 
 def_hparams = dotdict(
@@ -113,8 +113,6 @@ class ChessNetwork(NeuralNetwork):
     Once a stable architecutre is found it will be described in a markdown file in this directory.
     '''
     def __init__(self, name='delta_zero'):
- 
-
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9,
                                     allow_growth=True)
         config = tf.ConfigProto(gpu_options=gpu_options)
@@ -130,10 +128,14 @@ class ChessNetwork(NeuralNetwork):
                                f'{self.name}',
                                'tensorboard',
                                'logdir')
-        if not os.path.exists(log_dir):
+        existed = os.path.exists(log_dir)
+        if not existed:
             logger.info('Creating Tensorboard directory...')
+            
         self.writer = tf.summary.FileWriter(log_dir, self.graph)
-        self.flush_writer()
+
+        if not existed:
+            self.flush_writer()
         
         with self.graph.as_default():
             with self.session.as_default():
@@ -147,143 +149,137 @@ class ChessNetwork(NeuralNetwork):
         self.writer.flush()
         if verbose:
             logger.info('Tensorboard updated.')
-        
+
+    @tfsession
     def build(self):
-        
-        with self.graph.as_default():
-            with self.session.as_default():
-                with K.name_scope('input_layers'):
-                    X_in = X = Input(shape=(19, 8, 8))
-                    X = Conv2D(filters=self.hparams.body_filters,
-                               kernel_size=self.hparams.input_kernel_size,
-                               kernel_initializer='truncated_normal',
-                               strides=self.hparams.stride,
-                               padding='same',
-                               data_format='channels_first',
-                               use_bias=False,
-                               name='input_conv2d')(X)
-                    X = BatchNormalization(axis=1, name='input_batchnorm', epsilon=0.002)(X)
-                    X = Activation('relu', name='input_relu')(X)
-                    X = Conv2D(filters=self.hparams.residual_filters,
-                           kernel_size=self.hparams.input_kernel_size,
-                           kernel_initializer='truncated_normal',
-                           strides=self.hparams.stride,
-                           padding='same',
-                           data_format='channels_first',
-                           use_bias=False,
-                           name='input_conv2d2')(X)
-                    X = BatchNormalization(axis=1, name='input_batchnorm2', epsilon=0.002)(X)
-                    X = Activation('relu', name='input_relu2')(X)
-                for i in range(self.hparams.n_residual_layers):
-                    name = f'residual_layer_{i+1}'
-                    with K.name_scope(name):
-                        X = self._residual_layer(X, name)
-                residuals = X
-                with K.name_scope('policy_head'):
-                    policy_head = self._policy_layer(residuals)
-                with K.name_scope('value_head'):
-                    value_head = self._value_layer(residuals)
-                model = Model(X_in, [policy_head, value_head], name=self.name)
-                return model
+        with K.name_scope('input_layers'):
+            X_in = X = Input(shape=(19, 8, 8))
+            X = Conv2D(filters=self.hparams.body_filters,
+                       kernel_size=self.hparams.input_kernel_size,
+                       kernel_initializer='truncated_normal',
+                       strides=self.hparams.stride,
+                       padding='same',
+                       data_format='channels_first',
+                       use_bias=False,
+                       name='input_conv2d')(X)
+            X = BatchNormalization(axis=1, name='input_batchnorm', epsilon=0.002)(X)
+            X = Activation('relu', name='input_relu')(X)
+            X = Conv2D(filters=self.hparams.residual_filters,
+                       kernel_size=self.hparams.input_kernel_size,
+                       kernel_initializer='truncated_normal',
+                       strides=self.hparams.stride,
+                       padding='same',
+                       data_format='channels_first',
+                       use_bias=False,
+                       name='input_conv2d2')(X)
+            X = BatchNormalization(axis=1, name='input_batchnorm2', epsilon=0.002)(X)
+            X = Activation('relu', name='input_relu2')(X)
+            for i in range(self.hparams.n_residual_layers):
+                name = f'residual_layer_{i+1}'
+                with K.name_scope(name):
+                    X = self._residual_layer(X, name)
+            residuals = X
+            with K.name_scope('policy_head'):
+                policy_head = self._policy_layer(residuals)
+            with K.name_scope('value_head'):
+                value_head = self._value_layer(residuals)
+            model = Model(X_in, [policy_head, value_head], name=self.name)
+            return model
 
     def _value_layer(self, residuals):
     
-        with self.graph.as_default():
-            with self.session.as_default():
-                value = Conv2D(filters=32,
-                           kernel_size=2,
-                           kernel_initializer='truncated_normal',
-                           data_format='channels_first',
-                           use_bias=False,
-                           name='value_conv2d')(residuals)
-                value = BatchNormalization(axis=1, name='value_batchnorm')(value)
-                value = Activation('relu', name='value_relu')(value)
-                value = Flatten()(value)
-                value = Dense(self.hparams.fc_size, kernel_initializer='truncated_normal',
-                              activation='relu', name='value_fc')(value)
-                value = Dense(1, activation='tanh', name='value_out')(value)
-                return value
+        value = Conv2D(filters=32,
+                       kernel_size=2,
+                       kernel_initializer='truncated_normal',
+                       data_format='channels_first',
+                       use_bias=False,
+                       name='value_conv2d')(residuals)
+        value = BatchNormalization(axis=1, name='value_batchnorm')(value)
+        value = Activation('relu', name='value_relu')(value)
+        value = Flatten()(value)
+        value = Dense(self.hparams.fc_size, kernel_initializer='truncated_normal',
+                      activation='relu', name='value_fc')(value)
+        value = Dense(1, activation='tanh', name='value_out')(value)
+        return value
 
     def _policy_layer(self, residuals):
 
-        with self.graph.as_default():
-            with self.session.as_default():
-                policy = Conv2D(filters=self.hparams.policy_filters,
-                           kernel_size=2,
-                           kernel_initializer='truncated_normal',
-                           padding='same',
-                           data_format='channels_first',
-                           use_bias=False,
-                           name='policy_conv2d')(residuals)
-                policy = BatchNormalization(axis=1, name='policy_batchnorm')(policy)
-                policy = Activation('relu', name='policy_relu')(policy)
-                policy = Flatten()(policy)
-                policy = Dense(len(labels), activation='softmax',
-                               kernel_initializer='truncated_normal', name='policy_out')(policy)
-                return policy
+        policy = Conv2D(filters=self.hparams.policy_filters,
+                        kernel_size=2,
+                        kernel_initializer='truncated_normal',
+                        padding='same',
+                        data_format='channels_first',
+                        use_bias=False,
+                        name='policy_conv2d')(residuals)
+        policy = BatchNormalization(axis=1, name='policy_batchnorm')(policy)
+        policy = Activation('relu', name='policy_relu')(policy)
+        policy = Flatten()(policy)
+        policy = Dense(len(labels), activation='softmax',
+                       kernel_initializer='truncated_normal', name='policy_out')(policy)
+        return policy
 
-        
     def _residual_layer(self, X, name):
 
-        with self.graph.as_default():
-            with self.session.as_default():
-                _X = X
-                X = Conv2D(filters=self.hparams.residual_filters,
-                           kernel_size=self.hparams.residual_kernel_size,
-                           kernel_initializer='truncated_normal',
-                           padding='same',
-                           data_format='channels_first',
-                           use_bias=False,
-                           name=f'conv2d_{name}_1')(X)
-                X = BatchNormalization(axis=1, name=f'batchnorm_{name}_1', epsilon=0.002)(X)
-                X = Activation('relu', name=f'relu_{name}_1')(X)
-                X = Conv2D(filters=self.hparams.residual_filters,
-                           kernel_initializer='truncated_normal',
-                           kernel_size=self.hparams.residual_kernel_size,
-                           padding='same',
-                           data_format='channels_first',
-                           use_bias=False,
-                           name=f'conv2d_{name}_2')(X)
-                X = BatchNormalization(axis=1, name=f'batchnorm_{name}_2', epsilon=0.002)(X)
-                X = Add(name=f'combine_{name}')([_X, X])
-                X = Activation('relu', name=f'relu_{name}_2')(X)
-                return X
+        _X = X
+        X = Conv2D(filters=self.hparams.residual_filters,
+                   kernel_size=self.hparams.residual_kernel_size,
+                   kernel_initializer='truncated_normal',
+                   padding='same',
+                   data_format='channels_first',
+                   use_bias=False,
+                   name=f'conv2d_{name}_1')(X)
+        X = BatchNormalization(axis=1, name=f'batchnorm_{name}_1', epsilon=0.002)(X)
+        X = Activation('relu', name=f'relu_{name}_1')(X)
+        X = Conv2D(filters=self.hparams.residual_filters,
+                   kernel_initializer='truncated_normal',
+                   kernel_size=self.hparams.residual_kernel_size,
+                   padding='same',
+                   data_format='channels_first',
+                   use_bias=False,
+                   name=f'conv2d_{name}_2')(X)
+        X = BatchNormalization(axis=1, name=f'batchnorm_{name}_2', epsilon=0.002)(X)
+        X = Add(name=f'combine_{name}')([_X, X])
+        X = Activation('relu', name=f'relu_{name}_2')(X)
+        return X
 
-    
+    @tfsession
     def train(self, examples):
 
-        with self.graph.as_default():
-            with self.session.as_default():
-                es = EarlyStopping('val_loss', min_delta=0.05, patience=3)
-                a_s = [np.asarray(ex) for ex in examples]
-                ex_np = np.concatenate(a_s)
-                state = np.array([s for s in ex_np[:, 0]])
-                target_pi = np.array([p for p in ex_np[:, 1]])
-                target_v = np.array([v for v in ex_np[:, 2]])
-                self.model.fit(x=state,y=[target_pi, target_v],
-                               batch_size=self.hparams.batch_size,
-                               epochs=self.hparams.epochs,
-                               shuffle=True, validation_split=0.2,
-                               callbacks=[es]) # extra shuffling
+        es = EarlyStopping('val_loss', min_delta=0.05, patience=3)
+        a_s = [np.asarray(ex) for ex in examples]
+        ex_np = np.concatenate(a_s)
+        state = np.array([s for s in ex_np[:, 0]])
+        target_pi = np.array([p for p in ex_np[:, 1]])
+        target_v = np.array([v for v in ex_np[:, 2]])
+        self.model.fit(x=state,y=[target_pi, target_v],
+                       batch_size=self.hparams.batch_size,
+                       epochs=self.hparams.epochs,
+                       shuffle=True, validation_split=0.2,
+                       callbacks=[es]) # extra shuffling
     
-
     def batch_train(self, X=None, y=None, examples=None, shuffle=True):
         if X is not None and y is not None:
-            with self.graph.as_default():
-                with self.session.as_default():
-                    loss = self._single_batch_gd(X, y, shuffle=shuffle)
-                    s_summary = tf.Summary(value=[tf.Summary.Value(tag='scalar_loss', simple_value=loss[0])])
-                    p_summary = tf.Summary(value=[tf.Summary.Value(tag='policy_loss', simple_value=loss[1])])
-                    v_summary = tf.Summary(value=[tf.Summary.Value(tag='value_loss', simple_value=loss[2])])
-                    self.writer.add_summary(s_summary)
-                    self.writer.add_summary(p_summary)
-                    self.writer.add_summary(v_summary)
-                    return loss
+            loss = self._single_batch_gd(X, y, shuffle=shuffle)
+            s_summary = tf.Summary(value=[tf.Summary.Value(tag='scalar_loss', simple_value=loss[0])])
+            p_summary = tf.Summary(value=[tf.Summary.Value(tag='policy_loss', simple_value=loss[1])])
+            v_summary = tf.Summary(value=[tf.Summary.Value(tag='value_loss', simple_value=loss[2])])
+            self.writer.add_summary(s_summary)
+            self.writer.add_summary(p_summary)
+            self.writer.add_summary(v_summary)
+            return loss
         if examples is not None:
-            with self.graph.as_default():
-                with self.session.as_default():
-                    self._make_batches_and_gd(examples, shuffle=shuffle)
+            self._make_batches_and_gd(examples, shuffle=shuffle)
 
+    def _shuffle_batch(self, states, policies, values):
+        rs = np.random.get_state()
+        np.random.shuffle(states)
+        np.random.set_state(rs)
+        np.random.shuffle(policies)
+        np.random.set_state(rs)
+        np.random.shuffle(values)
+        np.random.set_state(rs)
+
+    @tfsession
     def _make_batches_and_gd(self, examples, shuffle=True):
         batch_size = self.hparams.batch_size
         n_examples = examples.shape[0]
@@ -297,13 +293,7 @@ class ChessNetwork(NeuralNetwork):
                 policies[j] = examples[j, 1]
                 values[j] = examples[j, 2]
             if shuffle:
-                rs = np.random.get_state()
-                np.random.shuffle(states)
-                np.random.set_state(rs)
-                np.random.shuffle(policies)
-                np.random.set_state(rs)
-                np.random.shuffle(values)
-                np.random.set_state(rs)
+                self._shuffle_batch(states, policies, values)
             loss = self.model.train_on_batch(states, [policies, values])
             s_summary = tf.Summary(value=[tf.Summary.Value(tag='scalar_loss', simple_value=loss[0])])
             p_summary = tf.Summary(value=[tf.Summary.Value(tag='policy_loss', simple_value=loss[1])])
@@ -315,19 +305,13 @@ class ChessNetwork(NeuralNetwork):
                         f'policy_loss: {loss[1]:.3f}, '
                         f'value_loss: {loss[2]:.3f}')
 
+    @tfsession
     def _single_batch_gd(self, X, y, shuffle=True):
         if shuffle:
-            rs = np.random.get_state()
-            np.random.shuffle(X)
-            np.random.set_state(rs)
-            np.random.shuffle(y[0])
-            np.random.set_state(rs)
-            np.random.shuffle(y[1])
-            np.random.set_state(rs)
-        with self.graph.as_default():
-            with self.session.as_default():
-                return self.model.train_on_batch(X, y)
+            self._shuffle_batch(X, y[0], y[1])
+        return self.model.train_on_batch(X, y)
 
+    @tfsession
     def predict_on_batch(self, X, y, shuffle=True):
         if shuffle:
             rs = np.random.get_state()
@@ -337,67 +321,60 @@ class ChessNetwork(NeuralNetwork):
             np.random.set_state(rs)
             np.random.shuffle(y[1])
             np.random.set_state(rs)
-        with self.graph.as_default():
-            with self.session.as_default():
-                return self.model.test_on_batch(X, y)
-            
-    def predict(self, state):
-                      
-        with self.graph.as_default():
-            with self.session.as_default():
-                state = np.expand_dims(state, axis=0)
-                pi, v = self.model.predict(state)
-                return pi[0], v[0]
+        return self.model.test_on_batch(X, y)
 
+    @tfsession
+    def predict(self, state):                      
+        state = np.expand_dims(state, axis=0)
+        pi, v = self.model.predict(state)
+        return pi[0], v[0]
+
+    @tfsession
     def save(self, version, ckpt=None):
         
-        with self.graph.as_default():
-            with self.session.as_default():
-                logger.info(f'Saving model... checkpoint? : {ckpt}')
-                directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                         'data',
-                                         f'{self.name}',
-                                         'models',
-                                         f'{version}')
+        logger.info(f'Saving model... checkpoint? : {ckpt}')
+        directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 'data',
+                                 f'{self.name}',
+                                 'models',
+                                 f'{version}')
 
-                if not os.path.exists(directory):
-                    os.makedirs(directory)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
 
-                if ckpt is None:
-                    fn = f'{self.name}_checkpoint.pth.tar'
-                else:
-                    fn = f'{self.name}_checkpoint_{ckpt}.pth.tar'
-                fn = os.path.join(directory, fn)
-                self.model.save_weights(fn)
-                logger.info(f'Model saved to {fn}')
-                self.flush_writer()
+        if ckpt is None:
+            fn = f'{self.name}_checkpoint.pth.tar'
+        else:
+            fn = f'{self.name}_checkpoint_{ckpt}.pth.tar'
+        fn = os.path.join(directory, fn)
+        self.model.save_weights(fn)
+        logger.info(f'Model saved to {fn}')
+        self.flush_writer()
 
+    @tfsession
     def load(self, version='nextgen', ckpt=None):
-        
-        with self.graph.as_default():
-            with self.session.as_default():
-                logger.info(f'Attempting model load... (version: {version}), checkpoint? : {ckpt}')
-                directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                         'data',
-                                         f'{self.name}',
-                                         'models',
-                                         f'{version}')
+        logger.info(f'Attempting model load... (version: {version}), checkpoint? : {ckpt}')
+        directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 'data',
+                                 f'{self.name}',
+                                 'models',
+                                 f'{version}')
 
-                if ckpt is None:
-                    fn = f'{self.name}_checkpoint.pth.tar'
-                else:
-                    fn = f'{self.name}_checkpoint_{ckpt}.pth.tar'
-                fn = os.path.join(directory, fn)
+        if ckpt is None:
+            fn = f'{self.name}_checkpoint.pth.tar'
+        else:
+            fn = f'{self.name}_checkpoint_{ckpt}.pth.tar'
+        fn = os.path.join(directory, fn)
 
-                if not os.path.exists(fn):
-                    ex = f'Could not load weights for model name: {self.name} => No checkpoint found.'
-                    logger.warn(ex)
-                    raise ValueError
+        if not os.path.exists(fn):
+            ex = f'Could not load weights for model name: {self.name} => No checkpoint found.'
+            logger.warn(ex)
+            raise ValueError
 
-                try:
-                    self.model.load_weights(fn)
-                except ValueError as e:
-                    logger.fatal(f'Could not load weights for model name: {self.name} => Network architecture mismatch. {e}')
-                    raise ValueError
-                logger.info(f'Model loaded from {fn}')
+        try:
+            self.model.load_weights(fn)
+        except ValueError as e:
+            logger.fatal(f'Could not load weights for model name: {self.name} => Network architecture mismatch. {e}')
+            raise ValueError
+        logger.info(f'Model loaded from {fn}')
     
