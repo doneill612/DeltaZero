@@ -121,7 +121,7 @@ class MCTS(object):
 
     Actions are explored according to policy network out to specified depth (`d`). 
     Nodes in the tree at depth `d` are leaf nodes and are evaluated using a 
-    value network. Values at each node in the tree updated via a backpropagation step.
+    value network. Values at each node in the tree are updated via a backpropagation step.
     A single iteration to `d` is referred to as a "playout" - as many
     playouts are executed, the probability of visiting nodes in the search tree evolves.
     The action associated with the most visited node after each of the playouts is the selected
