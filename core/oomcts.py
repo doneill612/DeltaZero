@@ -83,7 +83,7 @@ class Node(object):
         '''
         return self.q + self.u
 
-    def update(self, v, c_puct):
+    def update(self, v, c_puct, alpha=None):
         '''Update function.
         
         Runs a recursive update up the chain of tree nodes to the root node,
@@ -93,27 +93,32 @@ class Node(object):
         ------
             v (float) : The q value returned by the value network
             c_puct (float) : The exploration parameter c (hyperparameter of the search tree).
+            alpha (float, optional) : Dirichlet noise coefficient - added to the prior probability
+                                      of root nodes
         '''
         if self.parent:
-            self.parent.update(v, c_puct)
-        self._update(v, c_puct)
+            self.parent.update(v, c_puct, alpha=alpha)
+        self._update(v, c_puct, alpha=alpha)
 
-    def _update(self, v, c_puct):
+    def _update(self, v, c_puct, alpha=None):
         '''
         Increment the visit count for this tree node, adjust q and u values.
 
         Params
         ------
-        v : float
-            The q value returned by the value network
-        c_puct : float
-            The exploration parameter c (hyperparameter of the search tree).
+        v (float) : The q value returned by the value network
+        c_puct (float) : The exploration parameter c (hyperparameter of the search tree).
+        alpha (float, optional) : Dirichlet noise coefficient - added to the prior probability
+                                  of root nodes
         '''
         self.n += 1
         self.q += (v - self.q) / self.n
         if not self.is_root:
             self.u = c_puct * self.p * \
                      np.sqrt(self.parent.n) / (1 + self.n)
+        if self.is_root and alpha is not None:
+            noise = np.random.dirichlet(alpha)
+            self.p += noise
 
 class MCTS(object):
     '''
@@ -131,7 +136,7 @@ class MCTS(object):
     (and DeltaZero) use a single residual network with policy and value heads. Therefore a single
     network is used to estimate a policy for tree node exploration and a value for tree node q-value updating.
     '''
-    def __init__(self, network, c_puct=4., playout_depth=25, simulations=25):
+    def __init__(self, network, c_puct=4., playout_depth=25, simulations=25, noise=True):
         '''Constructs a Monte Carlo Search Tree.
         
         Params
@@ -143,12 +148,15 @@ class MCTS(object):
             c_puct (float) : Exploration parameter
             playout_depth (int) : The node depth to reach when executing the playout phase
             simulations (int) : The number of playouts to perform
+            noise (bool) : Whether or not to apply Dirichlet noise to prior probabilities in
+                           root nodes
         '''
         self.root = Node(None, 1.)
         self.network = network
         self.c_puct = c_puct
         self.playout_depth = playout_depth
         self.simulations = simulations
+        self.noise = noise
 
     def playout(self, env):
         '''Performs a single playout.
@@ -177,7 +185,8 @@ class MCTS(object):
             env.push_action(action)
             
         leaf_v = self.network.predict(env.canonical_board_state)[1]
-        node.update(leaf_v, self.c_puct)
+        alpha = self._alpha(env)
+        node.update(leaf_v, self.c_puct, alpha=alpha)
 
     def update(self, action):
         '''Update the tree search with a new root node.
@@ -242,3 +251,15 @@ class MCTS(object):
             masked_action_p /= np.sum(masked_action_p)
             
         return masked_action_p
+
+    def _alpha(self, env):
+        '''Gets a dirichlet noise coefficient'''
+        if not self.noise:
+            return None
+        n = len(env.legal_moves)
+        if n <= 10:
+            return 0.3
+        if n > 10 and n <= 40:
+            return 0.15
+        if n > 40:
+            return 0.03
