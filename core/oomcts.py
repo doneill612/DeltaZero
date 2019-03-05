@@ -22,19 +22,13 @@ class Node(object):
 
         Params
         ------
-        parent : Node
-            The parent node of this tree node. If parent is None, this node is a root node.
-        children : dict
-            Child tree nodes belonging to this node. If dict has 0 length, this node is a leaf node.
-            The dict maps UCI notation chess moves to Node objects.
-        n : int
-            Visit count of the tree node
-        q : float
-            Tree node Q-value
-        p : float
-            Prior probability of the tree node
-        u : float
-            Visit count-adjusted prior probability of the tree node
+            parent (Node) : The parent node of this tree node. If parent is None, this node is a root node.
+            children (dict) : Child tree nodes belonging to this node. If dict has 0 length, this node is a leaf node.
+                              The dict maps UCI notation chess moves to Node objects.
+            n (int) : Visit count of the tree node
+            q (float) : Tree node Q-value
+            p (float) : Prior probability of the tree node
+            u (float) : Visit count-adjusted prior probability of the tree node
         '''
         self.parent = parent
         self.children = {}
@@ -58,8 +52,7 @@ class Node(object):
 
         Returns
         -------
-        tuple
-           (action, Node) that maximizes q + u
+           (action, Node) tuple that maximizes q + u
         '''
         return max(self.children.items(), key=lambda s_a_node: s_a_node[1].evaluate())
     
@@ -71,8 +64,7 @@ class Node(object):
 
         Params
         ------
-        action_p : ndarray(shape=(1968, 2))
-            (action, prior probability) pairs returned by the policy network.
+        action_p (ndarray(shape=(1968, 2))) : (action, prior probability) pairs returned by the policy network.
         '''
         for ap in action_p:
             action = ap[0]
@@ -84,6 +76,10 @@ class Node(object):
         '''Evaluation function.
         
         Calculates the adjusted Q value (q + u) for this tree node.
+
+        Returns
+        -------
+            q + u for this node
         '''
         return self.q + self.u
 
@@ -95,10 +91,8 @@ class Node(object):
         
         Params
         ------
-        v : float
-            The q value returned by the value network
-        c_puct : float
-            The exploration parameter c (hyperparameter of the search tree).
+            v (float) : The q value returned by the value network
+            c_puct (float) : The exploration parameter c (hyperparameter of the search tree).
         '''
         if self.parent:
             self.parent.update(v, c_puct)
@@ -142,17 +136,13 @@ class MCTS(object):
         
         Params
         ------
-        root : Node
-            The root node (s_root in Silver et al.)
-        network : core.network.NeuralNetwork
-            The neural network with policy and value heads used for
-            policy and value estimation
-        c_puct : float
-            Exploration parameter
-        playout_depth : int
-            The node depth to reach when executing the playout phase
-        simulations : int
-            The number of playouts to perform
+            root (Node) : The root node (s_root in Silver et al.)
+            network (core.network.NeuralNetwork) : The neural network with policy 
+                                                   and value heads used for
+                                                   policy and value estimation
+            c_puct (float) : Exploration parameter
+            playout_depth (int) : The node depth to reach when executing the playout phase
+            simulations (int) : The number of playouts to perform
         '''
         self.root = Node(None, 1.)
         self.network = network
@@ -172,8 +162,8 @@ class MCTS(object):
 
         Params
         ------
-        env : core.environment.ChessEnvironment
-            The current environment state from which to perform a playout.
+            env (core.environment.ChessEnvironment) : The current environment state 
+                                                      from which to perform a playout.
         '''
         node = self.root
         for _ in range(self.playout_depth):
@@ -197,9 +187,8 @@ class MCTS(object):
 
         Params
         ------
-        action : str
-            The action that was taken in the environment 
-            after the last simulation round.
+            action (str) : The action that was taken in the environment 
+                           after the last simulation round.
         '''
         if action in self.root.children:
             self.root = self.root.children[action]
@@ -215,16 +204,15 @@ class MCTS(object):
 
         Params
         ------
-        env : core.environment.ChessEnvironment
-            The current environment state from which to execute
-            the full playout phase.
+            env (core.environment.ChessEnvironment) : The current environment state 
+                                                      from which to execute the full playout
+                                                      phase.
 
         Returns
         -------
-        res : dict
-            A dictionary containing keys 'a', 'pr', and 'q', corresponding
-            to the chosen action, said action's prior probability, and expected
-            result (Q-value) respectively.
+            res (dict) : A dictionary containing keys 'a', 'pr', and 'q', corresponding
+                         to the chosen action, said action's prior probability, and expected
+                         result (Q-value) respectively.
         '''
         for _ in range(self.simulations):
             self.playout(env.copy())
