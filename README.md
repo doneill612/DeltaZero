@@ -99,7 +99,7 @@ For each game, a single training example is extracted in the following manner:
 
 One training example per move is generated. DeltaZero trains with a batch size of 64, and uses `SGD` with LR decay (`1e-6`) and Nesterov Momentum as an optimizer, with an initial learning rate of 0.001.
 
-### oomcts.py
+### `oomcts.py`
 
 The `oomcts` (object-oriented MCTS, couldn't find a better name - `mcts.py` wasn't understandable enough in its current state, so a rework was done. `mcts.py` remains in the repo for reference) module contains two class definitions (`Node`, `MCTS`) which serve as an implementation of the Monte Carlo Tree Search algorithm, slightly modified to use the predictions of the current iteration of the neural network to generate move probabilities and value estimates. The MCTS hyperparameters are almost identical to those specified in the AlphaZero paper.
 
