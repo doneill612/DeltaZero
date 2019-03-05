@@ -6,10 +6,10 @@ import time
 import numpy as np
 import chess.pgn as pgn
 
-from delta_zero.environment import ChessEnvironment
-from delta_zero.network import ChessNetwork
-from delta_zero.utils import labels
-from delta_zero.dzlogging import Logger
+from core.environment import ChessEnvironment
+from core.network import ChessNetwork
+from core.utils import labels
+from core.dzlogging import Logger
 
 logger = Logger.get_logger('supervised-learning')
 
