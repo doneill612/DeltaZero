@@ -99,8 +99,10 @@ For each game, a single training example is extracted in the following manner:
 
 One training example per move is generated. DeltaZero trains with a batch size of 64, and uses `SGD` with LR decay (`1e-6`) and Nesterov Momentum as an optimizer, with an initial learning rate of 0.001.
 
-### mcts.py
+### oomcts.py
 
-The `mcts` module contains a class definition `MCTS` which is an implementation of the Monte Carlo Tree Search algorithm, slightly modified to use the predictions of the current iteration of the neural network to generate move probabilities. The MCTS hyperparameters are almost identical to those specified in the AlphaZero paper.
+The `oomcts` (object-oriented MCTS, couldn't find a better name - `mcts.py` wasn't understandable enough in its current state, so a rework was done. `mcts.py` remains in the repo for reference) module contains two class definitions (`Node`, `MCTS`) which serve as an implementation of the Monte Carlo Tree Search algorithm, slightly modified to use the predictions of the current iteration of the neural network to generate move probabilities and value estimates. The MCTS hyperparameters are almost identical to those specified in the AlphaZero paper.
 
-When playing a game of chess, the `ChessAgent` in order to make a move will run `N` simulations of MCTS in order to maximize the estimated value output of the game. Higher `N` values can be equated to deeper thinking. During evaluation games, `N = 800` is chosen. Different values of `N` are used to generate more varied games, and to gauge the prediction strength of the current network.
+When playing a game of chess, the `ChessAgent` will use the `MCTS` algorithm to find the "best" move to make. Actions are explored according to the policy network output. Given a board state, moves are explored out to a specified depth `d`. Nodes in the tree at depth `d` are leaf nodes and are evaluated using the value network output. Q-values at each node in the tree are updated via a backpropagation step, and are visit count-adjusted according to an exploration parameter `c_puct`. A single iteration to depth `d` is referred to as a "playout." As many playouts are executed (the number of playouts being referred to as the "simulation number"), the probability of visiting nodes in the search tree evolves. Actions are chosen in proportion to the node visit counts, as specified in *Silver et al*.
+
+During self-play, a small simulation number is used - typically between 25 and 50. This number can be increased as more computational power is available. AlphaZero used a simulation number of 800 in self-play games. When evaluating the network, a larger simulation number can be used - think of this as *deeper thinking*...
