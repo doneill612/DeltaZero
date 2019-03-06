@@ -1,129 +1,39 @@
-from abc import ABCMeta, abstractmethod
-from datetime import datetime
-
 import os
-
-import numpy as np
-
-from .utils import labels, dotdict, tfsession
-from .dzlogging import Logger
-
-def_hparams = dotdict(
-    body_filters=64,
-    residual_filters=128,
-    policy_filters=64,
-    input_kernel_size=3,
-    residual_kernel_size=3,
-    stride=1,
-    fc_size=256,
-    n_residual_layers=6,
-    learning_rate=.02,
-    batch_size=64,
-    epochs=3
-)
-
-logger = Logger.get_logger('ChessNetwork')
-
-class NeuralNetwork(object, metaclass=ABCMeta):
-    '''Abstract base class for neural networks in the context of DeltaZero.
-    
-    This provides a common interface for all potential neural network implementations,
-    independent of framework choice.
-    '''
-    def __init__(self, name, hparams):
-        '''Constructs a neural network.
-        
-        Params
-        ------
-            name (str): The name of the network. Used for IO operations.
-            hparams (dict): The network hyperparameters.
-        '''
-        self.name = name
-        self.hparams = hparams
-        self.model = self.build()
-        
-    @abstractmethod
-    def build(self):
-        '''
-        Builds the network model.
-        '''
-        raise NotImplementedError('build method must be implemented')
-
-    @abstractmethod
-    def train(self, examples):
-        '''
-        Trains the neural network on the provided examples.
-
-        According the AlphaZero paper, the neural network is responsible
-        for taking the board state as input and returning a policy vector
-        and scalar value estimation as output. Therefore, training examples
-        should be of the form,
-
-            (s; p, v), s := board state, p := policy vector, v := value
-
-        Params
-        ------
-            examples (array): A numpy.ndarray, or list, of training
-                              examples.
-        '''
-        raise NotImplementedError('train method must be implemented.')
-
-    @abstractmethod
-    def predict(self, state):
-        '''
-        Makes a (policy, value) prediction on given a board state.
-
-        Returns
-        -------
-            p (array): policy vector, numpy.ndarray
-            v (float): value
-        '''
-        raise NotImplementedError('predict method must be implemented.')
-
-    @abstractmethod
-    def save(self):
-        '''
-        Saves the weights and network configuration to separate files.
-        '''
-        raise NotImplementedError('save method must be implemented.')
-
-    @abstractmethod
-    def load(self):
-        '''
-        Loads the weights and network configuration.
-        '''
-        raise NotImplementedError('load method must be implemented.')
-
 
 import keras.backend as K
 
 from keras.engine import *
 from keras.layers import *
-from keras.models import Model
-from keras.optimizers import Adam, SGD
-from keras.regularizers import l2
+from keras.models import Model, load_model
+from keras.optimizers import SGD
 
+import numpy as np
 import tensorflow as tf
 
-class ChessNetwork(NeuralNetwork):
+from .neuralnet import NeuralNetwork, Config
+from core.utils import labels, dotdict, tfsession
+from core.dzlogging import Logger
+
+logger = Logger.get_logger('KerasNet')
+
+class KerasNetwork(NeuralNetwork):
     '''
     A Keras implementation of the neural network architecture.
 
     Architectural decisions follow very closely the approach outlined in the paper, with minor deviations.
     Once a stable architecutre is found it will be described in a markdown file in this directory.
     '''
-    def __init__(self, name='delta_zero'):
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9,
-                                    allow_growth=True)
-        config = tf.ConfigProto(gpu_options=gpu_options)
+    def __init__(self, name='delta_zero', config=Config.default_config()):
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9, allow_growth=True)
+        config_proto = tf.ConfigProto(gpu_options=gpu_options)
         
         self.graph = tf.Graph()
-        self.session = tf.Session(graph=self.graph, config=config)
+        self.session = tf.Session(graph=self.graph, config=config_proto)
+
         K.set_session(self.session)
 
-
-        super(ChessNetwork, self).__init__(name, def_hparams)
-        log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+        super(KerasNetwork, self).__init__(name, config=config)
+        log_dir = os.path.join(os.path.pardir,
                                'data',
                                f'{self.name}',
                                'tensorboard',
@@ -133,18 +43,18 @@ class ChessNetwork(NeuralNetwork):
             logger.info('Creating Tensorboard directory...')
             
         self.writer = tf.summary.FileWriter(log_dir, self.graph)
-
         if not existed:
             self.flush_writer()
-        
-        with self.graph.as_default():
-            with self.session.as_default():
-                self.model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
-                                   optimizer=SGD(lr=self.hparams.learning_rate,
-                                                 decay=1e-4,
-                                                 momentum=0.9,
-                                                 nesterov=True))
+        self.compile()
 
+    @tfsession
+    def compile(self):
+        self.model.compile(loss=['categorical_crossentropy', 'mean_squared_error'],
+                           optimizer=SGD(lr=self.config.learning_rate,
+                                         decay=self.config.lr_decay,
+                                         momentum=0.9,
+                                         nesterov=True))
+        
     def flush_writer(self, verbose=True):
         self.writer.flush()
         if verbose:
@@ -154,27 +64,27 @@ class ChessNetwork(NeuralNetwork):
     def build(self):
         with K.name_scope('input_layers'):
             X_in = X = Input(shape=(19, 8, 8))
-            X = Conv2D(filters=self.hparams.body_filters,
-                       kernel_size=self.hparams.input_kernel_size,
+            X = Conv2D(filters=self.config.body_filters,
+                       kernel_size=self.config.input_kernel_size,
                        kernel_initializer='truncated_normal',
-                       strides=self.hparams.stride,
+                       strides=self.config.stride,
                        padding='same',
                        data_format='channels_first',
                        use_bias=False,
                        name='input_conv2d')(X)
             X = BatchNormalization(axis=1, name='input_batchnorm', epsilon=0.002)(X)
             X = Activation('relu', name='input_relu')(X)
-            X = Conv2D(filters=self.hparams.residual_filters,
-                       kernel_size=self.hparams.input_kernel_size,
+            X = Conv2D(filters=self.config.residual_filters,
+                       kernel_size=self.config.input_kernel_size,
                        kernel_initializer='truncated_normal',
-                       strides=self.hparams.stride,
+                       strides=self.config.stride,
                        padding='same',
                        data_format='channels_first',
                        use_bias=False,
                        name='input_conv2d2')(X)
             X = BatchNormalization(axis=1, name='input_batchnorm2', epsilon=0.002)(X)
             X = Activation('relu', name='input_relu2')(X)
-            for i in range(self.hparams.n_residual_layers):
+            for i in range(self.config.n_residual_layers):
                 name = f'residual_layer_{i+1}'
                 with K.name_scope(name):
                     X = self._residual_layer(X, name)
@@ -188,8 +98,8 @@ class ChessNetwork(NeuralNetwork):
 
     def _value_layer(self, residuals):
     
-        value = Conv2D(filters=32,
-                       kernel_size=2,
+        value = Conv2D(filters=self.config.value_filters,
+                       kernel_size=self.config.value_kernel_size,
                        kernel_initializer='truncated_normal',
                        data_format='channels_first',
                        use_bias=False,
@@ -197,15 +107,15 @@ class ChessNetwork(NeuralNetwork):
         value = BatchNormalization(axis=1, name='value_batchnorm')(value)
         value = Activation('relu', name='value_relu')(value)
         value = Flatten()(value)
-        value = Dense(self.hparams.fc_size, kernel_initializer='truncated_normal',
+        value = Dense(self.config.fc_size, kernel_initializer='truncated_normal',
                       activation='relu', name='value_fc')(value)
         value = Dense(1, activation='tanh', name='value_out')(value)
         return value
 
     def _policy_layer(self, residuals):
 
-        policy = Conv2D(filters=self.hparams.policy_filters,
-                        kernel_size=2,
+        policy = Conv2D(filters=self.config.policy_filters,
+                        kernel_size=self.config.policy_kernel_size,
                         kernel_initializer='truncated_normal',
                         padding='same',
                         data_format='channels_first',
@@ -221,8 +131,8 @@ class ChessNetwork(NeuralNetwork):
     def _residual_layer(self, X, name):
 
         _X = X
-        X = Conv2D(filters=self.hparams.residual_filters,
-                   kernel_size=self.hparams.residual_kernel_size,
+        X = Conv2D(filters=self.config.residual_filters,
+                   kernel_size=self.config.residual_kernel_size,
                    kernel_initializer='truncated_normal',
                    padding='same',
                    data_format='channels_first',
@@ -230,9 +140,9 @@ class ChessNetwork(NeuralNetwork):
                    name=f'conv2d_{name}_1')(X)
         X = BatchNormalization(axis=1, name=f'batchnorm_{name}_1', epsilon=0.002)(X)
         X = Activation('relu', name=f'relu_{name}_1')(X)
-        X = Conv2D(filters=self.hparams.residual_filters,
+        X = Conv2D(filters=self.config.residual_filters,
                    kernel_initializer='truncated_normal',
-                   kernel_size=self.hparams.residual_kernel_size,
+                   kernel_size=self.config.residual_kernel_size,
                    padding='same',
                    data_format='channels_first',
                    use_bias=False,
@@ -244,7 +154,6 @@ class ChessNetwork(NeuralNetwork):
 
     @tfsession
     def train(self, examples):
-
         es = EarlyStopping('val_loss', min_delta=0.05, patience=3)
         a_s = [np.asarray(ex) for ex in examples]
         ex_np = np.concatenate(a_s)
@@ -252,11 +161,27 @@ class ChessNetwork(NeuralNetwork):
         target_pi = np.array([p for p in ex_np[:, 1]])
         target_v = np.array([v for v in ex_np[:, 2]])
         self.model.fit(x=state,y=[target_pi, target_v],
-                       batch_size=self.hparams.batch_size,
-                       epochs=self.hparams.epochs,
+                       batch_size=self.config.batch_size,
+                       epochs=self.config.epochs,
                        shuffle=True, validation_split=0.2,
                        callbacks=[es]) # extra shuffling
-    
+
+    @tfsession
+    def train_generator(self, generator, info_freq=10, write_freq=100):
+
+        epochs = self.config.epochs
+        e = 0
+        for e in tqdm(range(epochs), desc=f'Epoch {e+1}/{epochs}'):
+            for i, (X, y) in enumerate(generator):
+                loss = self.model.train_on_batch(X, y)
+                if info_freq > 0 and i % info_freq == 0:
+                    logger.info(f'loss: {loss[0]:.3f}, '
+                                f'policy_loss: {loss[1]:.3f}, '
+                                f'value_loss: {loss[2]:.3f}')
+                if write_freq > 0 and i % write_freq == 0:
+                    self.flush_writer()
+            
+        
     def batch_train(self, X=None, y=None, examples=None, shuffle=True):
         if X is not None and y is not None:
             loss = self._single_batch_gd(X, y, shuffle=shuffle)
@@ -281,7 +206,7 @@ class ChessNetwork(NeuralNetwork):
 
     @tfsession
     def _make_batches_and_gd(self, examples, shuffle=True):
-        batch_size = self.hparams.batch_size
+        batch_size = self.config.batch_size
         n_examples = examples.shape[0]
         for i in range(0, n_examples, batch_size):
             bs = min(i + batch_size, n_examples)
@@ -333,7 +258,7 @@ class ChessNetwork(NeuralNetwork):
     def save(self, version, ckpt=None):
         
         logger.info(f'Saving model... checkpoint? : {ckpt}')
-        directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+        directory = os.path.join(os.path.pardir,
                                  'data',
                                  f'{self.name}',
                                  'models',
@@ -343,38 +268,45 @@ class ChessNetwork(NeuralNetwork):
             os.makedirs(directory)
 
         if ckpt is None:
-            fn = f'{self.name}_checkpoint.pth.tar'
+            model_fn = f'{self.name}_checkpoint.h5'
         else:
-            fn = f'{self.name}_checkpoint_{ckpt}.pth.tar'
-        fn = os.path.join(directory, fn)
-        self.model.save_weights(fn)
-        logger.info(f'Model saved to {fn}')
+            model_fn = f'{self.name}_checkpoint_{ckpt}.h5'
+        model_fn = os.path.join(directory, model_fn)
+        config_fn = os.path.join(directory, f'{self.name}_config.pickle')
+        self.model.save(model_fn)
+        self.config.save(config_fn)
+        logger.info(f'Model saved to {model_fn}')
         self.flush_writer()
 
     @tfsession
     def load(self, version='nextgen', ckpt=None):
         logger.info(f'Attempting model load... (version: {version}), checkpoint? : {ckpt}')
-        directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+        directory = os.path.join(os.path.pardir,
                                  'data',
                                  f'{self.name}',
                                  'models',
                                  f'{version}')
 
         if ckpt is None:
-            fn = f'{self.name}_checkpoint.pth.tar'
+            model_fn = f'{self.name}_checkpoint.h5'
         else:
-            fn = f'{self.name}_checkpoint_{ckpt}.pth.tar'
-        fn = os.path.join(directory, fn)
-
-        if not os.path.exists(fn):
-            ex = f'Could not load weights for model name: {self.name} => No checkpoint found.'
-            logger.warn(ex)
-            raise ValueError
-
+            model_fn = f'{self.name}_checkpoint_{ckpt}.h5'
+        model_fn = os.path.join(directory, model_fn)
+        config_fn = os.path.join(directory, f'{self.name}_config.pickle')
+        if not os.path.exists(model_fn):
+            ex = f'No h5 file was found for model {self.name}.'
+            logger.fatal(ex)
+            raise RuntimeError('Model load failed.')
+        if not os.path.exists(config_fn):
+            logger.fatal(f'No configuration file was found for model {self.name}.')
+            raise RuntimeError('Model load failed.')
+        self.config = Config.load(config_fn)
         try:
-            self.model.load_weights(fn)
+            self.model = load_model(model_fn)
+            self.compile()
         except ValueError as e:
-            logger.fatal(f'Could not load weights for model name: {self.name} => Network architecture mismatch. {e}')
-            raise ValueError
-        logger.info(f'Model loaded from {fn}')
+            logger.fatal('Could not load h5 file for model {self.name}: {e}')
+            raise RunetimeError('Model load failed.')
+        logger.info(f'Model loaded from {model_fn}')
     
+
