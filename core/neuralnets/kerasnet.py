@@ -167,87 +167,28 @@ class KerasNetwork(NeuralNetwork):
                        callbacks=[es]) # extra shuffling
 
     @tfsession
-    def train_generator(self, generator, info_freq=10, write_freq=100):
+    def train_generator(self, generator, shuffle=True, info_freq=10, write_freq=100):
 
         epochs = self.config.epochs
         e = 0
         for e in tqdm(range(epochs), desc=f'Epoch {e+1}/{epochs}'):
             for i, (X, y) in enumerate(generator):
+                if shuffle:
+                    self._shuffle_batch(X, y[0], y[1])
                 loss = self.model.train_on_batch(X, y)
+                scalar_loss = loss[0]
+                policy_loss = loss[1]
+                value_loss = loss[2]
+                self._add_scalar_summaries(('scalar_loss', scalar_loss),
+                                           ('policy_loss', policy_loss),
+                                           ('value_loss', value_loss))
                 if info_freq > 0 and i % info_freq == 0:
-                    logger.info(f'loss: {loss[0]:.3f}, '
-                                f'policy_loss: {loss[1]:.3f}, '
-                                f'value_loss: {loss[2]:.3f}')
+                    logger.info(f'loss: {scalar_loss:.3f}, '
+                                f'policy_loss: {policy_loss:.3f}, '
+                                f'value_loss: {value_loss:.3f}')
                 if write_freq > 0 and i % write_freq == 0:
                     self.flush_writer()
-            
         
-    def batch_train(self, X=None, y=None, examples=None, shuffle=True):
-        if X is not None and y is not None:
-            loss = self._single_batch_gd(X, y, shuffle=shuffle)
-            s_summary = tf.Summary(value=[tf.Summary.Value(tag='scalar_loss', simple_value=loss[0])])
-            p_summary = tf.Summary(value=[tf.Summary.Value(tag='policy_loss', simple_value=loss[1])])
-            v_summary = tf.Summary(value=[tf.Summary.Value(tag='value_loss', simple_value=loss[2])])
-            self.writer.add_summary(s_summary)
-            self.writer.add_summary(p_summary)
-            self.writer.add_summary(v_summary)
-            return loss
-        if examples is not None:
-            self._make_batches_and_gd(examples, shuffle=shuffle)
-
-    def _shuffle_batch(self, states, policies, values):
-        rs = np.random.get_state()
-        np.random.shuffle(states)
-        np.random.set_state(rs)
-        np.random.shuffle(policies)
-        np.random.set_state(rs)
-        np.random.shuffle(values)
-        np.random.set_state(rs)
-
-    @tfsession
-    def _make_batches_and_gd(self, examples, shuffle=True):
-        batch_size = self.config.batch_size
-        n_examples = examples.shape[0]
-        for i in range(0, n_examples, batch_size):
-            bs = min(i + batch_size, n_examples)
-            states = np.empty(shape=(bs, 19, 8, 8))
-            policies = np.empty(shape=(bs, 1968))
-            values = np.empty(shape=(bs, 1))
-            for j in range(i, bs):
-                states[j] = examples[j, 0]
-                policies[j] = examples[j, 1]
-                values[j] = examples[j, 2]
-            if shuffle:
-                self._shuffle_batch(states, policies, values)
-            loss = self.model.train_on_batch(states, [policies, values])
-            s_summary = tf.Summary(value=[tf.Summary.Value(tag='scalar_loss', simple_value=loss[0])])
-            p_summary = tf.Summary(value=[tf.Summary.Value(tag='policy_loss', simple_value=loss[1])])
-            v_summary = tf.Summary(value=[tf.Summary.Value(tag='value_loss', simple_value=loss[2])])
-            self.writer.add_summary(s_summary)
-            self.writer.add_summary(p_summary)
-            self.writer.add_summary(v_summary)
-            logger.info(f'loss: {loss[0]:.3f}, '
-                        f'policy_loss: {loss[1]:.3f}, '
-                        f'value_loss: {loss[2]:.3f}')
-
-    @tfsession
-    def _single_batch_gd(self, X, y, shuffle=True):
-        if shuffle:
-            self._shuffle_batch(X, y[0], y[1])
-        return self.model.train_on_batch(X, y)
-
-    @tfsession
-    def predict_on_batch(self, X, y, shuffle=True):
-        if shuffle:
-            rs = np.random.get_state()
-            np.random.shuffle(X)
-            np.random.set_state(rs)
-            np.random.shuffle(y[0])
-            np.random.set_state(rs)
-            np.random.shuffle(y[1])
-            np.random.set_state(rs)
-        return self.model.test_on_batch(X, y)
-
     @tfsession
     def predict(self, state):                      
         state = np.expand_dims(state, axis=0)
@@ -256,7 +197,6 @@ class KerasNetwork(NeuralNetwork):
 
     @tfsession
     def save(self, version, ckpt=None):
-        
         logger.info(f'Saving model... checkpoint? : {ckpt}')
         directory = os.path.join(os.path.pardir,
                                  'data',
@@ -310,3 +250,16 @@ class KerasNetwork(NeuralNetwork):
         logger.info(f'Model loaded from {model_fn}')
     
 
+    def _add_scalar_summaries(self, *info):
+        for tag, scalar in info:
+            summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=scalar)])
+            self.writer.add_summary(summary)
+
+    def _shuffle_batch(self, states, policies, values):
+        rs = np.random.get_state()
+        np.random.shuffle(states)
+        np.random.set_state(rs)
+        np.random.shuffle(policies)
+        np.random.set_state(rs)
+        np.random.shuffle(values)
+        np.random.set_state(rs)

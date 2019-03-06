@@ -51,7 +51,7 @@ class NeuralNetwork(object, metaclass=ABCMeta):
         raise NotImplementedError('train method must be implemented.')
 
     @abstractmethod
-    def train_generator(self, generator, info_freq=10, write_freq=100):
+    def train_generator(self, generator, shuffle=True, info_freq=10, write_freq=100):
         '''
         Trains the neural network using examples provided by a generator.
 
@@ -66,6 +66,8 @@ class NeuralNetwork(object, metaclass=ABCMeta):
         ------
             generator (generator object) : A generator that yields training
                                            examples sequentially.
+            shuffle (bool) : Whether or not to shuffle the examples in the batch
+                             before performing gradient descent (recommended).
             info_freq (int) : The frequency in batches for which to receive
                               training statistics
             write_freq (int) : The frequency in batches for which to write
