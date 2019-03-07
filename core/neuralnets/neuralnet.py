@@ -52,7 +52,7 @@ class NeuralNetwork(object, metaclass=ABCMeta):
 
     @abstractmethod
     def train_generator(self, generator,
-                        version='current'
+                        version='current',
                         shuffle=True,
                         info_freq=10,
                         write_freq=100):

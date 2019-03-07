@@ -117,8 +117,8 @@ class Node(object):
             self.u = c_puct * self.p * \
                      np.sqrt(self.parent.n) / (1 + self.n)
         if self.is_root and alpha is not None:
-            noise = np.random.dirichlet(alpha)
-            self.p += noise
+            noise = np.random.dirichlet([alpha])
+            self.p += noise[0]
 
 class MCTS(object):
     '''
