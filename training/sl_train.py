@@ -1,19 +1,9 @@
 import argparse
-import os
-import io
-import time
 
-import numpy as np
-import chess.pgn as pgn
-
-from core.environment import ChessEnvironment
 from core.neuralnets.kerasnet import KerasNetwork
-from core.utils import labels
 from core.dzlogging import Logger
 
 logger = Logger.get_logger('supervised-learning')
-
-EPS = 1e-6
 
 def train(net_name, generator_tag, version='current', ckpt=None):
     
@@ -45,7 +35,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     net_name = args.net_name
+    generator_tag = args.generator_tag
     version = args.version
     ckpt = args.ckpt
     
-    train(net_name, version=version, ckpt=ckpt)
+    train(net_name, generator_tag, version=version, ckpt=ckpt)
