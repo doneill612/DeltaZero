@@ -11,6 +11,11 @@ from core.dzlogging import Logger
 
 logger = Logger.get_logger('ExampleGenerator')
 
+GENERATORS = {
+    'lichess': 'lichess_db_standard_rated_2013-07.pgn',
+    'kingbase': 'KingBaseLite2019-C60-C99.pgn'
+}
+
 class ExampleGenerator(object):
     '''
     A wrapper class providing support for mini-batch training
@@ -18,9 +23,9 @@ class ExampleGenerator(object):
     steps - namely reading the PGN files for supervised learning and
     generating training examples from the games.
     '''
-    def __init__(self, tag, floc):
+    def __init__(self, tag):
         self.tag = tag
-        self.floc = floc
+        self.floc = GENERATORS[self.tag]
         Stockfish.ENGINE.start()
 
     def get(self, batch_size):
