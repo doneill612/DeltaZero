@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import os
 import platform
@@ -8,7 +9,7 @@ import chess
 import chess.pgn as pgn
 import numpy as np
 
-import chess.uci as uci
+import chess.engine as c_engine
 
 from .dzlogging import Logger
 
@@ -62,8 +63,7 @@ class ChessEnvironment(object):
     @property
     def legal_moves(self):
         '''
-        Returns a list of the curre
-nt legal moves in the position.
+        Returns a list of the current legal moves in the position.
         The moves are represented in UCI notation.
 
         Returns
@@ -178,39 +178,6 @@ nt legal moves in the position.
         '''
         self._end_game(0)
         
-    def adjudicate(self):
-        '''
-        Adjudicates the game in progress by performing a centipawn evaluation
-        on the current position using Stockfish 10.
-        '''
-        logger.info('Adjudicating game...')
-        current_os = platform.system()
-        handler = uci.InfoHandler()
-        ep = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data',
-                          f'stockfish-10-{"win" if current_os == "Windows" else "linux"}',
-                          f'{current_os}',
-                          f'stockfish_10_x64{".exe" if current_os == "Windows" else ""}')
-        engine = uci.popen_engine(ep)
-        engine.info_handlers.append(handler)
-        engine.position(self.board)
-        evaltime = 1000
-        evalu = engine.go(movetime=evaltime)
-        score = handler.info['score'][1].cp
-        if score is None:
-            score = f'Mate in {handler.info["score"][1].mate}'
-        else:
-            score = score / 100.
-
-        if isinstance(score, str):
-            self._end_game(1 if self.white_to_move else -1)
-        else:
-            if score > 2.:
-                self._end_game(1)
-            elif score < -2:
-                self._end_game(-1)
-            else:
-                self._end_game(0)
-
     def push_action(self, action_uci):
         '''
         Updates the internal board representation by pushing an "action" to the move stack.
@@ -306,7 +273,7 @@ nt legal moves in the position.
             for piece in PIECES:
                 idxs = []
                 for flat_idx in self.get_pieces(piece, color):
-                    idx = np.unravel_index(flat_idx, dims=(8,8))
+                    idx = np.unravel_index(flat_idx, shape=(8,8))
                     idxs.append(idx)
                 for r, f in idxs:
                     p_planes[pidx][r][f] = 1

@@ -1,9 +1,12 @@
+import asyncio
+import chess.engine as engine
 import numpy as np
 
 class dotdict(dict):
     def __getattr__(self, name):
         return self[name]
 
+    
 def tfsession(func):
     def wrapper(*args):
         _self = args[0]

@@ -167,12 +167,24 @@ class KerasNetwork(NeuralNetwork):
                        callbacks=[es]) # extra shuffling
 
     @tfsession
-    def train_generator(self, generator, shuffle=True, info_freq=10, write_freq=100):
+    def train_generator(self, generator,
+                        version='current',
+                        shuffle=True,
+                        info_freq=10,
+                        write_freq=100,
+                        save_freq=10000):
 
+        if save_freq <= 0:
+            save_freq = 10000
+        if info_freq <= 0:
+            info_freq = 10
+        if write_freq <= 0:
+            write_freq = 100
+            
         epochs = self.config.epochs
         e = 0
         for e in tqdm(range(epochs), desc=f'Epoch {e+1}/{epochs}'):
-            for i, (X, y) in enumerate(generator):
+            for i, (X, y) in enumerate(generator.get(self.config.batch_size)):
                 if shuffle:
                     self._shuffle_batch(X, y[0], y[1])
                 loss = self.model.train_on_batch(X, y)
@@ -188,7 +200,9 @@ class KerasNetwork(NeuralNetwork):
                                 f'value_loss: {value_loss:.3f}')
                 if write_freq > 0 and i % write_freq == 0:
                     self.flush_writer()
-        
+                if i % save_freq == 0:
+                        self.save(version=version, ckpt=i+1)
+                
     @tfsession
     def predict(self, state):                      
         state = np.expand_dims(state, axis=0)

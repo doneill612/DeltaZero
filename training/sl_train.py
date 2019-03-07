@@ -7,7 +7,7 @@ import numpy as np
 import chess.pgn as pgn
 
 from core.environment import ChessEnvironment
-from core.network import ChessNetwork
+from core.neuralnets.kerasnet import KerasNetwork
 from core.utils import labels
 from core.dzlogging import Logger
 
@@ -16,7 +16,7 @@ logger = Logger.get_logger('supervised-learning')
 EPS = 1e-6
 
 def train(net_name, version='current', ckpt=None):
-    net = ChessNetwork(net_name)
+    net = KerasNetwork(net_name)
 
     if version not in ('current', 'nextgen'):
         logger.fatal(f'Invalid version type: {version}. '
@@ -25,33 +25,11 @@ def train(net_name, version='current', ckpt=None):
 
     try:
         net.load(version=version, ckpt=ckpt)
-    except:
-        pass
+    except RuntimeError as e:
+        logger.warning('There was an error loading the model... '
+                       'You are training a fresh model!')
 
-
-    start = time.time()
-    for e in range(net.hparams.epochs):
-        gen = lichess_generator(net.hparams.batch_size)
-        logger.info(f'Epoch {e + 1}/{net.hparams.epochs}')
-        for i, (X, y) in enumerate(gen):
-            loss = net.batch_train(X=X, y=y)
-            if (i+1) % 10 == 0:
-                logger.info(f'loss: {loss[0]:.3f}, '
-                        f'pi_loss: {loss[1]:.3f}, '
-                        f'v_loss: {loss[2]:.3f}')
-                elapsed = time.time() - start
-                elapsed_str = f'{elapsed:.3f}'
-                mins = elapsed // 60
-                if mins >= 1:
-                    elapsed_str = f'{int(mins)} min. {elapsed - 60 * mins:.3f} sec.'
-                logger.info(f'Elapsed: {elapsed_str} sec.')
-                if (i+1) % 100 == 0:
-                    net.flush_writer(verbose=True)
-            if (i+1) % 10000 == 0:
-                # save the model every 1000 steps (1 step = batch_size examples)
-                net.save(version=version, ckpt=(i+1))
-        # save the model every epoch
-        net.save(version=version)
+    net.train_generator(lichess_generator)
                     
 def clip(elo):
     y = (1. - np.exp(-.000822 * elo))
