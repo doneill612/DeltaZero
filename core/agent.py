@@ -12,7 +12,7 @@ from .dzlogging import Logger
 def_params = dotdict(
     temp_threshold=30,
     max_hmoves=200,
-    n_book_moves=1,
+    n_book_moves=0,
 )
 
 logger = Logger.get_logger('ChessAgent')
@@ -44,7 +44,7 @@ class ChessAgent(object):
         self.search_tree = search_tree
         self.params = params
 
-    def play(self, game_name, save=True):
+    def play(self, game_name, save=True, show_moves=False):
         '''
         Makes the agent play itself in a game of chess.
         '''
@@ -73,18 +73,21 @@ class ChessAgent(object):
                 if action is not None:
                     examples.append([c_state, pr, 0.])
             else:
-                pi = self.search_tree.pi(self.env, temp=temperature)
+                pi = self.search_tree.pi(self.env)#, temp=temperature)
                 action = pi['a']
                 examples.append([c_state, pi['pr'], pi['q']])
             if action is None and use_book:
-                pi = self.search_tree.pi(self.env, temp=temperature)
+                pi = self.search_tree.pi(self.env)#, temp=temperature)
                 action = pi['a']
                 
                 examples.append([c_state, pi['pr'], pi['q']])
             
             self.env.push_action(action)
+            self.search_tree.update(action)
             
             turn *= -1
+            if show_moves:
+                print(self.env)
 
         res_val = self.env.result_value()
         if save:
@@ -99,12 +102,13 @@ class ChessAgent(object):
         if use_book:
             action = self._get_book_move(step)
         else:
-            pi = self.search_tree.pi(self.env, temp=temp)
+            pi = self.search_tree.pi(self.env)#, temp=temp)
             action = pi['a']
         if action is None:
-            pi = self.search_tree.pi(self.env, temp=temp)
+            pi = self.search_tree.pi(self.env)#, temp=temp)
             action = pi['a']
         self.env.push_action(action)
+        self.search_tree.update(action)
         
 
     def reset(self):

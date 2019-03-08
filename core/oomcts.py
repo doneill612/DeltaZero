@@ -45,16 +45,28 @@ class Node(object):
     def is_root(self):
         return self.parent is None
 
-    def select(self):
+    def select(self, env):
         '''Selection function.
 
         Selects a child tree node with the highest Q+U value.
 
+        Params
+        ------
+            env (core.environment.ChessEnvironment) : the environment
         Returns
         -------
            (action, Node) tuple that maximizes q + u
         '''
-        return max(self.children.items(), key=lambda s_a_node: s_a_node[1].evaluate())
+        best = None
+        legal = env.legal_moves
+        qu_max = -float('inf')
+        for a, n in self.children.items():
+            if a in legal:
+                qu = n.evaluate()
+                if qu > qu_max:
+                    qu_max = qu
+                    best = (a, n)
+        return best
     
     def expand(self, action_p):
         '''Expansion function.
@@ -181,7 +193,7 @@ class MCTS(object):
                 action_p = self.network.predict(env.canonical_board_state)[0]
                 action_p = self._mask_illegal(action_p, env)
                 node.expand(np.column_stack((labels, action_p)))
-            action, node = node.select()
+            action, node = node.select(env)
             env.push_action(action)
             
         leaf_v = self.network.predict(env.canonical_board_state)[1]
@@ -223,7 +235,7 @@ class MCTS(object):
                          to the chosen action, said action's prior probability, and expected
                          result (Q-value) respectively.
         '''
-        for _ in range(self.simulations):
+        for _ in tqdm(range(self.simulations), desc='Simulating...'):
             self.playout(env.copy())
 
         res = {'a': None, 'pr': None, 'q': None}
@@ -234,6 +246,9 @@ class MCTS(object):
         res['q'] = most_visited[1].q
         
         return res
+
+    def reset(self):
+        self.root = Node(None, 1.)
 
     def _mask_illegal(self, action_p, env):
         '''Masks illegal moves with 0 probability in the given state.'''

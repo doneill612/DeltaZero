@@ -1,5 +1,10 @@
 import argparse
+import os
+import sys
 
+sys.path.append(os.path.join(os.path.pardir, os.path.dirname(__file__)))
+
+from generators import ExampleGenerator
 from core.neuralnets.kerasnet import KerasNetwork
 from core.dzlogging import Logger
 
@@ -16,9 +21,9 @@ def train(net_name, generator_tag, version='current', ckpt=None):
         raise ValueError('Invalid version type')
 
     try:
-        net.load(version=version, ckpt=ckpt)
+        net.load(version, ckpt)
     except RuntimeError as e:
-        logger.warning('There was an error loading the model... '
+        logger.warn('There was an error loading the model... '
                        'You are training a fresh model!')
 
     net.train_generator(generator)

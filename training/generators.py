@@ -4,7 +4,7 @@ import os
 import chess.pgn as pgn
 import numpy as np
 
-from .engine import Stockfish
+from engine import Stockfish
 from core.environment import ChessEnvironment
 from core.utils import labels
 from core.dzlogging import Logger

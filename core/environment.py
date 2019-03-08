@@ -149,7 +149,7 @@ class ChessEnvironment(object):
             folder_name (str): The folder name to contain the .pgn file
             file_name (str): The file name to use for the .pgn file
         '''
-        pgn_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+        pgn_path = os.path.join(os.path.pardir,
                                 'data', folder_name, 'pgns')
         if not os.path.exists(pgn_path):
             os.makedirs(pgn_path)

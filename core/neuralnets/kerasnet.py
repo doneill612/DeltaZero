@@ -10,6 +10,8 @@ from keras.optimizers import SGD
 import numpy as np
 import tensorflow as tf
 
+from tqdm import tqdm
+
 from .neuralnet import NeuralNetwork, Config
 from core.utils import labels, dotdict, tfsession
 from core.dzlogging import Logger
@@ -84,17 +86,17 @@ class KerasNetwork(NeuralNetwork):
                        name='input_conv2d2')(X)
             X = BatchNormalization(axis=1, name='input_batchnorm2', epsilon=0.002)(X)
             X = Activation('relu', name='input_relu2')(X)
-            for i in range(self.config.n_residual_layers):
-                name = f'residual_layer_{i+1}'
-                with K.name_scope(name):
-                    X = self._residual_layer(X, name)
-            residuals = X
-            with K.name_scope('policy_head'):
-                policy_head = self._policy_layer(residuals)
-            with K.name_scope('value_head'):
-                value_head = self._value_layer(residuals)
-            model = Model(X_in, [policy_head, value_head], name=self.name)
-            return model
+        for i in range(self.config.n_residual_layers):
+            name = f'residual_layer_{i+1}'
+            with K.name_scope(name):
+                X = self._residual_layer(X, name)
+        residuals = X
+        with K.name_scope('policy_head'):
+            policy_head = self._policy_layer(residuals)
+        with K.name_scope('value_head'):
+            value_head = self._value_layer(residuals)
+        model = Model(X_in, [policy_head, value_head], name=self.name)
+        return model
 
     def _value_layer(self, residuals):
     
@@ -201,7 +203,7 @@ class KerasNetwork(NeuralNetwork):
                 if write_freq > 0 and i % write_freq == 0:
                     self.flush_writer()
                 if i % save_freq == 0:
-                        self.save(version=version, ckpt=i+1)
+                        self.save(version, i+1)
                 
     @tfsession
     def predict(self, state):                      
